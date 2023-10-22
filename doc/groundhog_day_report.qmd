@@ -1,0 +1,152 @@
+---
+title: "Momentary Subjective Happiness"
+subtitle: "Autobiographical Probabilistic Reversal Learning Project"
+author: "Corrado Caudek"
+date: "21/10/2023"
+bibliography: bibliography.bib
+csl: apa.csl
+format: html
+editor: visual
+---
+
+## Autobiographical Probabilistic Reversal Learning (APRL) Task
+
+```{r}
+#| include = FALSE
+#| 
+suppressPackageStartupMessages({
+  library("here")
+  library("targets")
+  library("tidyverse")
+  library("mice")
+  library("lme4")
+  library("brms")
+  library("bayesplot")
+  library("effectsize")
+  library("scales")
+  library("sjstats")
+  library("sjPlot")
+  library("sjmisc")
+  library("emmeans")
+})
+```
+
+# Introduction
+
+@jangraw2023highly examined the prevailing assumption of a stable affective background throughout experimental procedures. It unveils a phenomenon termed 'Mood Drift Over Time', which encapsulates a systematic decrement in participants' mood across time during simple tasks or rest periods. This discovery not only challenges the traditional methodological supposition of mood constancy during an experiment but also elucidates a relationship among mood drift, reward sensitivity, and life happiness.
+
+@jangraw2023highly suggest a nuanced interplay where the connection between mood drift and reward sensitivity is modulated by an individual's overall life happiness. This modulation could act as either a buffer or amplifier in this relationship, highlighting the inherent complexity in mood dynamics across different individuals. Such insights could significantly impact the design of experiments in affective science, urging a consideration of broader life circumstances and attitudinal orientations of participants.
+
+@jangraw2023highly propose a hypothesis in tandem with theories of opportunity cost, positing that extended monotony may disrupt humans' anticipations concerning the frequency of rewards and punishments, with the subsequent mood decline potentially serving as a gauge of perceived opportunity cost. This, in turn, could steer behavioral decisions between persisting with a task (exploitation) or transitioning to a new task (exploration).
+
+Interestingly, a diminished negative mood drift was observed among depressed participants, a seeming paradox that is unraveled by differentiating between trait-based and state-based negative affects. This finding, resonating with the reduced reward valuation inherent in depression, suggests a moderated mood drift in depressed individuals, potentially due to a diminished discord with reward expectations. The moderation by depression risk opens a wider discourse on motivation and environmental engagement among depressed individuals, thereby enriching the comprehension of mood drift's broader psychological and clinical ramifications. Through these findings, the study beckons a more nuanced exploration of mood dynamics, underscoring the necessity for methodological refinements in affective science research.
+
+
+## Method
+
+### Task Design
+
+Emerging evidence shows many computational measures to have poor psychometric properties. This poses a risk of undermining the use of these measures for studying mental disorders. This is largely a consequence of over-relying on cross-sectional single-task study designs. To move forward, the field needs to embrace longitudinal designs with batteries of tasks [@karvelis2023individual].
+
+
+We employed a novel task that we refer to as Autobiographical Probabilistic Reversal Learning (APRL). This task combines elements of traditional Probabilistic Reversal Learning (PRL) with an autobiographical reflective component, wherein participants reconsider their actions during the most salient event of their day.
+
+Participants were prompted in the evening to reflect on the most salient event of their day. Following this reflective period, they engaged in a PRL task that consisted of 30 choice trials per session. In each trial, participants were asked to make one of two decisions: either "I would act as I did" or "I would choose the opposite course of action."
+
+After making their choice, participants received feedback in a manner consistent with standard PRL tasks. The learning environment was manipulated to be either "volatile" or "stable." In the volatile environment, a reversal in reward probabilities occurred after the 15th trial. In contrast, the stable environment maintained constant reward probabilities throughout all 30 trials.
+
+For both types of environments, the initial reward probabilities were set at 0.2 for choosing "the same action as actually happened" and 0.2 for opting for "the opposite course of action." In the volatile environment, these probabilities switched after the 15th trial, whereas in the stable environment, they remained constant.
+
+The procedure was repeated for 12 days.
+
+## Effect of Environment on Alpha
+
+```{r}
+tar_load(brms_fitted_mod_alpha)
+```
+
+```{r}
+pp_check(brms_fitted_mod_alpha) + xlim(0, 1)
+```
+
+```{r}
+bayes_R2(brms_fitted_mod_alpha)
+```
+
+```{r}
+summary(brms_fitted_mod_alpha)
+```
+
+```{r}
+conditional_effects(brms_fitted_mod_alpha, "environment")
+```
+
+### Interpretation
+
+In a highly volatile environment, an agent might benefit from a higher α value, allowing it to rapidly update its expectations to adapt to the changing contingencies. A high α value places more weight on recent outcomes, making the agent more responsive to changes. The present data show that this is the case. This also indicates that participants completed the task in an appropriate manner.
+
+## Effect of **APRL** Task on Mood Change
+
+The change in reported mood after the APRL task (mood_post - mood_pre) was analyzed with the following model. Mood_pre was centered within each participant.
+
+``` R
+mod_mood_1 <- brm(
+    mood_dif ~ mood_pre_cw * environment +
+      (mood_pre_cw * environment | user_id / ema_number),
+    family = student(),
+    data = params_happiness_clean_df,
+    control = list(adapt_delta = 0.99, max_treedepth = 20),
+    refresh = 0
+  )
+```
+
+```{r}
+tar_load(brms_fitted_mod_mood_1)
+```
+
+```{r}
+pp_check(brms_fitted_mod_mood_1) + xlim(-100, 100)
+```
+
+```{r}
+bayes_R2(brms_fitted_mod_mood_1)
+```
+
+```{r}
+summary(brms_fitted_mod_mood_1)
+```
+
+```{r}
+conditional_effects(brms_fitted_mod_mood_1, "environment")
+```
+
+```{r}
+conditional_effects(brms_fitted_mod_mood_1, "mood_pre_cw")
+```
+
+```{r}
+loo_mood_1 <- loo(brms_fitted_mod_mood_1)
+plot(loo_mood_1)
+```
+
+```{r}
+print(loo_mood_1)
+```
+
+Compute and display the 95% CI for each level of environment
+
+```{r}
+emm_res <- emmeans(brms_fitted_mod_mood_1, specs = "environment")
+confint(emm_res, level = 0.95)
+```
+
+Perform hypothesis testing
+
+```{r}
+hyp_test <- hypothesis(
+  brms_fitted_mod_mood_1, 
+  hypothesis = "environmentVolatile < 0"
+)
+print(hyp_test)
+```
+

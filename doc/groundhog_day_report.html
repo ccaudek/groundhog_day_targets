@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Corrado Caudek">
+<meta name="dcterms.date" content="2024-09-10">
+
+<title>Momentary Subjective Happiness</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="groundhog_day_report_files/libs/clipboard/clipboard.min.js"></script>
+<script src="groundhog_day_report_files/libs/quarto-html/quarto.js"></script>
+<script src="groundhog_day_report_files/libs/quarto-html/popper.min.js"></script>
+<script src="groundhog_day_report_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="groundhog_day_report_files/libs/quarto-html/anchor.min.js"></script>
+<link href="groundhog_day_report_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="groundhog_day_report_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="groundhog_day_report_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="groundhog_day_report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="groundhog_day_report_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Momentary Subjective Happiness</h1>
+<p class="subtitle lead">Autobiographical Probabilistic Reversal Learning Project</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Corrado Caudek </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">September 10, 2024</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="autobiographical-probabilistic-reversal-learning-aprl-task" class="level2">
+<h2 class="anchored" data-anchor-id="autobiographical-probabilistic-reversal-learning-aprl-task">Autobiographical Probabilistic Reversal Learning (APRL) Task</h2>
+</section>
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p><span class="citation" data-cites="jangraw2023highly">Jangraw et al. (<a href="#ref-jangraw2023highly" role="doc-biblioref">2023</a>)</span> examined the prevailing assumption of a stable affective background throughout experimental procedures. It unveils a phenomenon termed ‘Mood Drift Over Time’, which encapsulates a systematic decrement in participants’ mood across time during simple tasks or rest periods. This discovery not only challenges the traditional methodological supposition of mood constancy during an experiment but also elucidates a relationship among mood drift, reward sensitivity, and life happiness.</p>
+<p><span class="citation" data-cites="jangraw2023highly">Jangraw et al. (<a href="#ref-jangraw2023highly" role="doc-biblioref">2023</a>)</span> suggest a nuanced interplay where the connection between mood drift and reward sensitivity is modulated by an individual’s overall life happiness. This modulation could act as either a buffer or amplifier in this relationship, highlighting the inherent complexity in mood dynamics across different individuals. Such insights could significantly impact the design of experiments in affective science, urging a consideration of broader life circumstances and attitudinal orientations of participants.</p>
+<p><span class="citation" data-cites="jangraw2023highly">Jangraw et al. (<a href="#ref-jangraw2023highly" role="doc-biblioref">2023</a>)</span> propose a hypothesis in tandem with theories of opportunity cost, positing that extended monotony may disrupt humans’ anticipations concerning the frequency of rewards and punishments, with the subsequent mood decline potentially serving as a gauge of perceived opportunity cost. This, in turn, could steer behavioral decisions between persisting with a task (exploitation) or transitioning to a new task (exploration).</p>
+<p>Interestingly, a diminished negative mood drift was observed among depressed participants, a seeming paradox that is unraveled by differentiating between trait-based and state-based negative affects. This finding, resonating with the reduced reward valuation inherent in depression, suggests a moderated mood drift in depressed individuals, potentially due to a diminished discord with reward expectations. The moderation by depression risk opens a wider discourse on motivation and environmental engagement among depressed individuals, thereby enriching the comprehension of mood drift’s broader psychological and clinical ramifications. Through these findings, the study beckons a more nuanced exploration of mood dynamics, underscoring the necessity for methodological refinements in affective science research.</p>
+<section id="method" class="level2">
+<h2 class="anchored" data-anchor-id="method">Method</h2>
+<section id="task-design" class="level3">
+<h3 class="anchored" data-anchor-id="task-design">Task Design</h3>
+<p>Emerging evidence shows many computational measures to have poor psychometric properties. This poses a risk of undermining the use of these measures for studying mental disorders. This is largely a consequence of over-relying on cross-sectional single-task study designs. To move forward, the field needs to embrace longitudinal designs with batteries of tasks <span class="citation" data-cites="karvelis2023individual">(<a href="#ref-karvelis2023individual" role="doc-biblioref">Karvelis et al., 2023</a>)</span>.</p>
+<p>We employed a novel task that we refer to as Autobiographical Probabilistic Reversal Learning (APRL). This task combines elements of traditional Probabilistic Reversal Learning (PRL) with an autobiographical reflective component, wherein participants reconsider their actions during the most salient event of their day.</p>
+<p>Participants were prompted in the evening to reflect on the most salient event of their day. Following this reflective period, they engaged in a PRL task that consisted of 30 choice trials per session. In each trial, participants were asked to make one of two decisions: either “I would act as I did” or “I would choose the opposite course of action.”</p>
+<p>After making their choice, participants received feedback in a manner consistent with standard PRL tasks. The learning environment was manipulated to be either “volatile” or “stable.” In the volatile environment, a reversal in reward probabilities occurred after the 15th trial. In contrast, the stable environment maintained constant reward probabilities throughout all 30 trials.</p>
+<p>For both types of environments, the initial reward probabilities were set at 0.2 for choosing “the same action as actually happened” and 0.2 for opting for “the opposite course of action.” In the volatile environment, these probabilities switched after the 15th trial, whereas in the stable environment, they remained constant.</p>
+<p>The procedure was repeated for 12 days.</p>
+</section>
+</section>
+<section id="effect-of-environment-on-alpha" class="level2">
+<h2 class="anchored" data-anchor-id="effect-of-environment-on-alpha">Effect of Environment on Alpha</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tar_load</span>(brms_fitted_mod_alpha)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">pp_check</span>(brms_fitted_mod_alpha) <span class="sc">+</span> <span class="fu">xlim</span>(<span class="dv">0</span>, <span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Using 10 posterior draws for ppc type 'dens_overlay' by default.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Removed 182 rows containing non-finite values (`stat_density()`).</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="groundhog_day_report_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bayes_R2</span>(brms_fitted_mod_alpha)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Estimate   Est.Error       Q2.5      Q97.5
+R2 0.07237294 0.009744302 0.05511954 0.09237689</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(brms_fitted_mod_alpha)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> Family: asym_laplace 
+  Links: mu = identity; sigma = identity; quantile = identity 
+Formula: alpha ~ environment + (environment | user_id/ema_number) 
+   Data: params_happiness_clean_df (Number of observations: 2131) 
+  Draws: 1 chains, each with iter = 1000; warmup = 0; thin = 1;
+         total post-warmup draws = 1000
+
+Group-Level Effects: 
+~user_id (Number of levels: 215) 
+                                   Estimate Est.Error l-95% CI u-95% CI Rhat
+sd(Intercept)                          0.00      0.00     0.00     0.01 1.00
+sd(environmentVolatile)                0.01      0.00     0.00     0.01 1.00
+cor(Intercept,environmentVolatile)    -0.03      0.39    -0.74     0.70 1.00
+                                   Bulk_ESS Tail_ESS
+sd(Intercept)                           925      934
+sd(environmentVolatile)                 911      880
+cor(Intercept,environmentVolatile)      938      914
+
+~user_id:ema_number (Number of levels: 2131) 
+                                   Estimate Est.Error l-95% CI u-95% CI Rhat
+sd(Intercept)                          0.00      0.00     0.00     0.01 1.00
+sd(environmentVolatile)                0.00      0.00     0.00     0.01 1.00
+cor(Intercept,environmentVolatile)     0.07      0.54    -0.86     0.91 1.00
+                                   Bulk_ESS Tail_ESS
+sd(Intercept)                           856      786
+sd(environmentVolatile)                 687     1029
+cor(Intercept,environmentVolatile)      885      769
+
+Population-Level Effects: 
+                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept               0.16      0.00     0.15     0.17 1.00      919      984
+environmentVolatile     0.07      0.00     0.06     0.08 1.00     1069      869
+
+Family Specific Parameters: 
+         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sigma        0.03      0.00     0.03     0.03 1.00      952      760
+quantile     0.36      0.01     0.35     0.37 1.00     1007      834
+
+Draws were sampled using variational(meanfield). </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">conditional_effects</span>(brms_fitted_mod_alpha, <span class="st">"environment"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="groundhog_day_report_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<section id="interpretation" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation">Interpretation</h3>
+<p>In a highly volatile environment, an agent might benefit from a higher α value, allowing it to rapidly update its expectations to adapt to the changing contingencies. A high α value places more weight on recent outcomes, making the agent more responsive to changes. The present data show that this is the case. This also indicates that participants completed the task in an appropriate manner.</p>
+</section>
+</section>
+<section id="effect-of-aprl-task-on-mood-change" class="level2">
+<h2 class="anchored" data-anchor-id="effect-of-aprl-task-on-mood-change">Effect of <strong>APRL</strong> Task on Mood Change</h2>
+<p>The change in reported mood after the APRL task (mood_post - mood_pre) was analyzed with the following model. Mood_pre was centered within each participant.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>mod_mood_1 <span class="ot">&lt;-</span> <span class="fu">brm</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    mood_dif <span class="sc">~</span> mood_pre_cw <span class="sc">*</span> environment <span class="sc">+</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>      (mood_pre_cw <span class="sc">*</span> environment <span class="sc">|</span> user_id <span class="sc">/</span> ema_number),</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="fu">student</span>(),</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> params_happiness_clean_df,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">control =</span> <span class="fu">list</span>(<span class="at">adapt_delta =</span> <span class="fl">0.99</span>, <span class="at">max_treedepth =</span> <span class="dv">20</span>),</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">refresh =</span> <span class="dv">0</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tar_load</span>(brms_fitted_mod_mood_1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">pp_check</span>(brms_fitted_mod_mood_1) <span class="sc">+</span> <span class="fu">xlim</span>(<span class="sc">-</span><span class="dv">100</span>, <span class="dv">100</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Using 10 posterior draws for ppc type 'dens_overlay' by default.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Removed 39 rows containing non-finite values (`stat_density()`).</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="groundhog_day_report_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bayes_R2</span>(brms_fitted_mod_mood_1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    Estimate   Est.Error      Q2.5     Q97.5
+R2 0.8943159 0.007883346 0.8787709 0.9091754</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(brms_fitted_mod_mood_1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Parts of the model have not converged (some Rhats are &gt; 1.05). Be
+careful when analysing the results! We recommend running more iterations and/or
+setting stronger priors.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: There were 8 divergent transitions after warmup. Increasing
+adapt_delta above 0.8 may help. See
+http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code> Family: student 
+  Links: mu = identity; sigma = identity; nu = identity 
+Formula: mood_dif ~ mood_pre_cw + environment + (mood_pre_cw + environment | user_id/ema_number) 
+   Data: params_happiness_clean_df (Number of observations: 2131) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Group-Level Effects: 
+~user_id (Number of levels: 215) 
+                                     Estimate Est.Error l-95% CI u-95% CI Rhat
+sd(Intercept)                            9.97      0.63     8.80    11.32 1.01
+sd(mood_pre_cw)                          0.26      0.02     0.23     0.30 1.00
+sd(environmentVolatile)                  2.33      1.15     0.15     4.27 1.03
+cor(Intercept,mood_pre_cw)               0.15      0.09    -0.03     0.32 1.01
+cor(Intercept,environmentVolatile)       0.08      0.29    -0.38     0.78 1.01
+cor(mood_pre_cw,environmentVolatile)     0.15      0.28    -0.40     0.76 1.01
+                                     Bulk_ESS Tail_ESS
+sd(Intercept)                             653     1030
+sd(mood_pre_cw)                          1283     1950
+sd(environmentVolatile)                    91      311
+cor(Intercept,mood_pre_cw)                775     1379
+cor(Intercept,environmentVolatile)        428      544
+cor(mood_pre_cw,environmentVolatile)      496      578
+
+~user_id:ema_number (Number of levels: 2131) 
+                                     Estimate Est.Error l-95% CI u-95% CI Rhat
+sd(Intercept)                            2.89      0.78     1.32     4.43 1.04
+sd(mood_pre_cw)                          0.30      0.02     0.27     0.33 1.01
+sd(environmentVolatile)                  2.20      0.89     0.40     3.94 1.04
+cor(Intercept,mood_pre_cw)               0.85      0.08     0.66     0.98 1.12
+cor(Intercept,environmentVolatile)      -0.89      0.17    -0.99    -0.44 1.01
+cor(mood_pre_cw,environmentVolatile)    -0.70      0.21    -0.97    -0.21 1.04
+                                     Bulk_ESS Tail_ESS
+sd(Intercept)                             139      276
+sd(mood_pre_cw)                           256      593
+sd(environmentVolatile)                   130      298
+cor(Intercept,mood_pre_cw)                 30      175
+cor(Intercept,environmentVolatile)        297      531
+cor(mood_pre_cw,environmentVolatile)      160      482
+
+Population-Level Effects: 
+                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept              -0.16      0.76    -1.67     1.33 1.03      291      776
+mood_pre_cw            -0.75      0.02    -0.79    -0.71 1.00     1239     1775
+environmentVolatile    -1.45      0.44    -2.32    -0.61 1.00     1407     1816
+
+Family Specific Parameters: 
+      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sigma     2.93      0.28     2.42     3.51 1.01      213      556
+nu        1.84      0.18     1.53     2.22 1.00      627     1396
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">conditional_effects</span>(brms_fitted_mod_mood_1, <span class="st">"environment"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="groundhog_day_report_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">conditional_effects</span>(brms_fitted_mod_mood_1, <span class="st">"mood_pre_cw"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="groundhog_day_report_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>loo_mood_1 <span class="ot">&lt;-</span> <span class="fu">loo</span>(brms_fitted_mod_mood_1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Found 87 observations with a pareto_k &gt; 0.7 in model
+'brms_fitted_mod_mood_1'. It is recommended to set 'moment_match = TRUE' in
+order to perform moment matching for problematic observations.</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(loo_mood_1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="groundhog_day_report_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(loo_mood_1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Computed from 4000 by 2131 log-likelihood matrix
+
+         Estimate    SE
+elpd_loo  -7761.3  50.2
+p_loo      1806.8  29.2
+looic     15522.5 100.4
+------
+Monte Carlo SE of elpd_loo is NA.
+
+Pareto k diagnostic values:
+                         Count Pct.    Min. n_eff
+(-Inf, 0.5]   (good)     1774  83.2%   43        
+ (0.5, 0.7]   (ok)        270  12.7%   28        
+   (0.7, 1]   (bad)        83   3.9%   21        
+   (1, Inf)   (very bad)    4   0.2%   14        
+See help('pareto-k-diagnostic') for details.</code></pre>
+</div>
+</div>
+<p>Compute and display the 95% CI for each level of environment</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>emm_res <span class="ot">&lt;-</span> <span class="fu">emmeans</span>(brms_fitted_mod_mood_1, <span class="at">specs =</span> <span class="st">"environment"</span>)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">confint</span>(emm_res, <span class="at">level =</span> <span class="fl">0.95</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> environment  emmean lower.HPD upper.HPD
+ Stable      -0.0152     -1.52   1.46436
+ Volatile    -1.4660     -2.84  -0.00107
+
+Point estimate displayed: median 
+HPD interval probability: 0.95 </code></pre>
+</div>
+</div>
+<p>Perform hypothesis testing</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>hyp_test <span class="ot">&lt;-</span> <span class="fu">hypothesis</span>(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  brms_fitted_mod_mood_1, </span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">hypothesis =</span> <span class="st">"environmentVolatile &lt; 0"</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(hyp_test)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Hypothesis Tests for class b:
+                Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
+1 (environmentVolat... &lt; 0    -1.45      0.44     -2.2    -0.75       1999
+  Post.Prob Star
+1         1    *
+---
+'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
+'*': For one-sided hypotheses, the posterior probability exceeds 95%;
+for two-sided hypotheses, the value tested against lies outside the 95%-CI.
+Posterior probabilities of point hypotheses assume equal prior probabilities.</code></pre>
+</div>
+</div>
+
+</section>
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-line-spacing="2" role="list">
+<div id="ref-jangraw2023highly" class="csl-entry" role="listitem">
+Jangraw, D. C., Keren, H., Sun, H., Bedder, R. L., Rutledge, R. B., Pereira, F., Thomas, A. G., Pine, D. S., Zheng, C., Nielson, D. M., et al. (2023). A highly replicable decline in mood during rest and simple tasks. <em>Nature Human Behaviour</em>, <em>7</em>(4), 596–610.
+</div>
+<div id="ref-karvelis2023individual" class="csl-entry" role="listitem">
+Karvelis, P., Paulus, M. P., &amp; Diaconescu, A. O. (2023). Individual differences in computational psychiatry: A review of current challenges. <em>Neuroscience &amp; Biobehavioral Reviews</em>, 105137.
+</div>
+</div></section></div></main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
