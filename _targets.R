@@ -6,28 +6,24 @@
 #   <https://books.ropensci.org/targets/walkthrough.html#inspect-the-pipeline> # nolint
 
 # Load packages required to define the pipeline:
-library("here")
-library("targets")
-library("tarchetypes")
-
-library("dplyr")
-library("mice")
-library("brms")
-library("bayesplot")
-library("effectsize")
-library("scales")
-library("sjstats")
-library("sjPlot")
-library("sjmisc")
+suppressPackageStartupMessages({
+  library("here")
+  library("targets")
+  library("tarchetypes")
+  library("tidyverse")
+  library("brms")
+  library("mice")
+})
 
 
 # Set target options:
 tar_option_set(
   # packages that your targets need to run
   packages = c(
-    "here", "tidyverse", "mice", "brms", "quarto", "bayesplot", 
+    "here", "tarchetypes", "tidyverse", "mice", "brms", "quarto", "bayesplot", 
     "effectsize", "sjstats", "sjPlot", "sjmisc", "emmeans"), 
-  format = "rds" # default storage format
+  format = "rds", # default storage format
+  seed = 12345
   # Set other options as needed.
 )
 
@@ -38,47 +34,47 @@ options(clustermq.scheduler = "multicore")
 # Install packages {{future}}, {{future.callr}}, and {{future.batchtools}} to allow use_targets() to configure tar_make_future() options.
 
 # Run the R scripts in the R/ folder with your custom functions:
-tar_source()
-source(here::here("R", "funs", "funs_instant_mood.R"))
-source(here::here("R", "funs", "funs_quest.R"))
-source(here::here("R", "functions.R"))
-# source("other_functions.R") # Source other scripts as needed.
+tar_source(here::here("R", "funs", "funs_instant_mood.R"))
+tar_source(here::here("R", "funs", "funs_quest.R"))
+tar_source(here::here("R", "funs", "functions_pre_post.R"))
+
 
 # Replace the target list below with your own:
 list(
   
   # Get raw PRL data.
   tar_target(
-    raw_df, 
+    raw_df,
     here::here("data", "prep", "groundhog_all_clean.RDS"), format = "file"
   ),
-  
+
   # Clean PRL data. raw_df is the input to get_data() and prl_df is the output.
+  # prl_df has 63930 rows.
   tar_target(prl_df, get_data(raw_df)),
-  
+
   # Get parameters of the momentary happiness model.
   tar_target(
-    params_happiness_df, 
+    params_happiness_df,
     get_params_happiness_model(prl_df, unique(prl_df$user_id))
   ),
 
   # Clean parameters of the momentary happiness model.
   tar_target(
-    params_happiness_clean_df, 
+    params_happiness_clean_df,
     clean_params_happiness_model(params_happiness_df)
-  ),
-  
+  )
+
   # brms model for alpha and volatility
-  tar_target(
-    brms_fitted_mod_alpha, 
-    brms_mod_alpha(params_happiness_clean_df)
-  ),
-  
-  # brms model for mood_dif 
-  tar_target(
-    brms_fitted_mod_mood_1, 
-    brms_mod_mood_1(params_happiness_clean_df)
-  ),
+  # tar_target(
+  #   brms_fitted_mod_alpha,
+  #   brms_mod_alpha(params_happiness_clean_df)
+  # ),
+
+  # brms model for mood_dif
+  # tar_target(
+  #   brms_fitted_mod_mood_1,
+  #   brms_mod_mood_1(params_happiness_clean_df)
+  # ),
   
   # brms model for mood_dif with also happiness parameters
   # tar_target(
@@ -86,15 +82,31 @@ list(
   #   brms_mod_mood_2(params_happiness_clean_df)
   # ),
   
-  # Create report
-  tar_quarto(
-    name = report,
-    path = here::here("doc/groundhog_day_report.qmd")
-  )
+  # Fit the brms model with mood_dif as a function of time x environment.
+  # mood_pre is used as a covariate, and time is coded in terms of the linear, 
+  # quadratic, and cubic components of ema_number.
+  # tar_target(
+  #   brms_fitted_mod_mood_3,
+  #   brms_mod_mood_3(params_happiness_clean_df)
+  # ),
+  
+  # Compute predicted values of model brms_fitted_mod_mood_3 and 
+  # generate figure.
+  # tar_target(
+  #   plot_mood_dif_ema_number,
+  #   get_plot_mood_dif_ema_number(
+  #     params_happiness_clean_df, brms_fitted_mod_mood_3
+  #   )
+  # ),
+  # 
+  # Create report.
+  # tar_quarto(
+  #   name = report,
+  #   path = here::here("doc", "groundhog_day_report.qmd")
+  # )
   
 # close list  
 )
-
 
 
 

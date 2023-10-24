@@ -19,25 +19,35 @@ compute_predicted_happiness <- function(params, data, ...) {
   w1 <- params[2]
   w2 <- params[3]
   w3 <- params[4]
-  w4 <- params[5]
-  w5 <- params[6]
-  gamma <- params[7]
+  w4 <- params[5]  # New weight for zmoodpre
+  w5 <- params[6]  # New weight for zcontrol
+  gamma <- params[7]  # Update the index for gamma
+  
+  zmoodpre = data$zmoodpre
+  zcontrol = data$zcontrol
   
   predicted_happiness <- numeric(nrow(data))
   
   for (t in 1:nrow(data)) {
-    predicted_happiness[t] <- w0 +
-      w1 * sum(gamma^(t-1:(t-1)) * data$outcome[1:(t-1)]) +
-      w2 * sum(gamma^(t-1:(t-1)) * data$reversal[1:(t-1)]) +
-      w3 * sum(gamma^(t-1:(t-1)) * data$stimulus[1:(t-1)]) +
-      w4 * sum(gamma^(t-1:(t-1)) * data$delta_p[1:(t-1)]) +
-      w5 * sum(gamma^(t-1:(t-1)) * data$RPE[1:(t-1)])
+    weighted_outcome = sum(gamma^(0:(t-1)) * rev(data$outcome[1:t]))
+    # weighted_reversal = 0 # sum(gamma^(0:(t-1)) * rev(data$reversal[1:t]))
+    weighted_stimulus = sum(gamma^(0:(t-1)) * rev(data$stimulus[1:t]))
+    # weighted_delta_p = 0 # sum(gamma^(0:(t-1)) * rev(data$delta_p[1:t]))
+    weighted_RPE = sum(gamma^(0:(t-1)) * rev(data$RPE[1:t]))
+    
+    predicted_happiness[t] <- w0 + 
+      w1 * weighted_outcome +
+      # w2 * weighted_reversal +
+      w2 * weighted_stimulus +
+      # w4 * weighted_delta_p +
+      w3 * weighted_RPE +
+      w4 * zmoodpre[t] +  # Include zmoodpre
+      w5 * zcontrol[t]    # Include zcontrol
   }
   
-  res <- unlist(predicted_happiness)
-  
-  return(res)
+  return(predicted_happiness)
 }
+
 
 
 # nll() ------------------------------------------------------------------------
@@ -63,7 +73,7 @@ nll <- function(params, data) {
 # Define function to process a single user
 process_user <- function(id, dz_clean) {
   
-  set.seed(123)
+  set.seed(12345)
   
   onesubj_data <- dz_clean |> 
     dplyr::filter(user_id == id)
@@ -78,7 +88,7 @@ process_user <- function(id, dz_clean) {
       dplyr::filter(ema_number == i) |> 
       dplyr::select(
         user_id, ema_number, trial, is_target_chosen, is_reversal, 
-        feedback, zim
+        feedback, zim, zmoodpre, zcontrol
       )
     
     # Required information for a single session of a subject.
@@ -87,20 +97,20 @@ process_user <- function(id, dz_clean) {
       stimulus = ifelse(
         ema_session$is_target_chosen == 0, -1, ema_session$is_target_chosen
       ), # 1 for stimulus A, -1 for stimulus B
-      # reversal = c(rep(0, 14), 1, rep(0, 15)),  # Reversal occurs at trial 15
       reversal = ifelse(
         ema_session$is_reversal == "yes",
         c(rep(0, 15), 1, rep(0, 14)),
         rep(0, 30)
       ),
       outcome = ifelse(ema_session$feedback == 0, -1, ema_session$feedback),
-      # delta_p = c(rep(0, 15), 0.6, rep(0, 14)),  # Change in probability at reversal
       delta_p = ifelse(
         ema_session$is_reversal == "yes",
         c(rep(0, 15), 0.6, rep(0, 14)),
         rep(0, 30)
       ),
-      happiness = ema_session$zim # standardized by user_id
+      happiness = ema_session$zim, # standardized by user_id
+      zmoodpre = ema_session$zmoodpre, # standardized by user_id
+      zcontrol = ema_session$zcontrol # standardized by user_id
     )
     
     # Get alpha for a single ema_number session and the current user_id
@@ -111,8 +121,21 @@ process_user <- function(id, dz_clean) {
     # Optimize
     # Initial guesses for w0, w1, w2, w3, w4, w5, and gamma
     init_params <- c(0, 0, 0, 0, 0, 0, 0.5)  
-    opt_result <- optim(init_params, nll, data=df)
-    mle_params <- opt_result$par
+    
+    # Wrap optimization in tryCatch
+    opt_result <- tryCatch({
+      optim(init_params, nll, data=df)
+    }, error = function(e) {
+      warning("Optimization failed for this set of parameters, returning NA")
+      return(NULL)
+    })
+    
+    if (is.null(opt_result)) {
+      mle_params <- rep(NA, length(init_params))
+    } else {
+      mle_params <- opt_result$par
+    }
+    
     # add further information
     out <- c(
       mle_params, 
@@ -144,14 +167,6 @@ process_user <- function(id, dz_clean) {
 #' @description
 #' Compute alpha for a single session of a subject.
 #' @param df the DataFrame for a subject and session structured like this:
-#'
-#' $ trial               <int> 1, 2, 3, 4, 5, 
-#' $ stimulus            <dbl> -1, 1, 1, 1, 1, 
-#' $ reversal            <dbl> 0, 0, 0, 0, 0, 
-#' $ outcome             <dbl> -1, 1, 1, 1, 
-#' $ delta_p             <dbl> 0.0, 0.0, 0.0, 
-#' $ happiness           <dbl> -0.8576963, -2.4460228, 
-#' 
 #' @return alpha
 
 get_alpha <- function(df) {
