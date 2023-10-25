@@ -63,7 +63,7 @@ for (id in unique_users) {
     # Get alpha for a single ema_number session and the current user_id
     best_alpha = get_alpha(df)
     # Add the RPE column to the df DataFrame
-    df = add_pre(df, best_alpha)
+    df = add_rpe(df, best_alpha)
     
     subj_code <- unique(ema_session$user_id)
     
@@ -101,6 +101,7 @@ hist(final_df$happiness_hat)
 
 # Calculate mean and standard error of the mean (SEM)
 foo <- final_df |> 
+  # dplyr::filter(ema_session == 12) |> 
   group_by(reversal, trial) |> 
   summarize(
     h = mean(happiness, trim = 0.1, na.rm = TRUE),
@@ -123,28 +124,81 @@ foo |>
 
 
 
+cor.test(
+  final_df$happiness, final_df$happiness_hat, 
+  na.action=na.omit, method = "spearman"
+)
 
 
+fm <- brm(
+  mood_dif ~ mood_pre + environment + (w1 + w2 + w3 + w4 + w5) +
+    (mood_pre + environment + (w1 + w2 + w3 + w4 + w5) | user_id / ema_number),
+  data = params_happiness_clean_df,
+  family = student(),
+  backend = "cmdstanr"
+)
+pp_check(fm) + xlim(-80, 80)
+summary(fm)
+conditional_effects(fm, "w1")
+conditional_effects(fm, "environment")
+conditional_effects(fm, "mood_pre")
 
 
+performance::r2_bayes(fm)
 
 
-foo |> 
-  group_by(reversal) |> 
-  summarize(
-    happiness = mean (h),
-    pred_happiness = mean(h_hat)
+#### QUEST
+
+scs_scores <- rio::import(
+  here::here(
+    "data", "prep", "quest_scales", "scs_scores.csv"
   )
+)
+scs_scores$user_id <- as.numeric(scs_scores$user_id)
+
+mydat <- left_join(params_happiness_clean_df, scs_scores, by = "user_id")
+
+mydat <- mydat[!is.na(mydat$scs_total_score), ]
+length(unique(mydat$user_id))
+
+mydat$scs <- as.vector(scale(mydat$scs_total_score))
+mydat$mpre <- as.vector(scale(mydat$mood_pre))
+mydat$mpost <- as.vector(scale(mydat$mood_post))
 
 
-cor.test(final_df$happiness, final_df$happiness_hat, na.action=na.omit)
+
+
+######################################
+# Outliers detection
+
+params_values <- params_happiness_df |> 
+  dplyr::select(w0, w1, w2, w3, w4, w5, gamma)
+
+# Finding the center point 
+params_center <- colMeans(params_values)
+
+# Finding the covariance matrix
+params_cov <- cov(params_values)
+
+# Calculate Mahalanobis distance and add to data
+params_values$mdist <- mahalanobis(
+  x = params_values,
+  center = params_center,
+  cov = params_cov
+)
+
+# Cutoff values from chi-square distribution to identify outliers
+cutoff <- qchisq(p = 0.99, df = ncol(params_values[, 1:7]))
+
+# Add outliers based on Mahalanobis distance to data
+params_values <- params_values %>%
+  mutate(is_outlier = ifelse(mdist > cutoff, 1, 0))
 
 
 
+table(params_values$is_outlier)
 
-
-
-
+foo <- params_values[params_values$is_outlier == 0, ]
 
 
 

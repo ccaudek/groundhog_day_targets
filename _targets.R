@@ -34,9 +34,9 @@ options(clustermq.scheduler = "multicore")
 # Install packages {{future}}, {{future.callr}}, and {{future.batchtools}} to allow use_targets() to configure tar_make_future() options.
 
 # Run the R scripts in the R/ folder with your custom functions:
-tar_source(here::here("R", "funs", "funs_instant_mood.R"))
+tar_source(here::here("R", "funs", "funs_mood_modeling.R"))
+tar_source(here::here("R", "funs", "funs_brms.R"))
 tar_source(here::here("R", "funs", "funs_quest.R"))
-tar_source(here::here("R", "funs", "functions_pre_post.R"))
 
 
 # Replace the target list below with your own:
@@ -52,7 +52,13 @@ list(
   # prl_df has 63930 rows.
   tar_target(prl_df, get_data(raw_df)),
 
-  # Get parameters of the momentary happiness model.
+  # Estimate the parameters of the momentary happiness model.
+  # nrow(params_happiness_df) = 2131
+  # names(params_happiness_df)
+  # [1] "w0"          "w1"          "w2"          "w3"          "w4"         
+  # [6] "w5"          "gamma"       "is_reversal" "ema_number"  "user_id"    
+  # [11] "alpha"       "mood_pre"    "mood_post"   "control"     "zmoodpre"   
+  # [16] "zcontrol"  
   tar_target(
     params_happiness_df,
     get_params_happiness_model(prl_df, unique(prl_df$user_id))
