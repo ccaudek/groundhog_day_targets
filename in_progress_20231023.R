@@ -14,6 +14,8 @@ tar_load(prl_df)
 params <- params_happiness_clean_df |> 
   ungroup()
 
+# Ci sono 22 soggetti con alpha = 0. Andrebbero rimossi.
+
 # Initialize an empty data frame to store the results
 final_df <- data.frame()
 
@@ -31,7 +33,12 @@ unique_users <- unique(dz_clean$user_id)
 
 # Loop through each unique user_id.
 for (id in unique_users) {
+  # Select one subject 
   onesubj_data <- dz_clean %>% dplyr::filter(user_id == id)
+  
+  # Get alpha for all ema_number sessions and the current user_id
+  best_alpha = get_alpha_all_sessions(onesubj_data)
+  
   n_ema_episodes <- length(unique(onesubj_data$ema_number))
   
   # Loop through each ema_number for the current user_id.
@@ -60,8 +67,6 @@ for (id in unique_users) {
       zcontrol = ema_session$zcontrol
     )
     
-    # Get alpha for a single ema_number session and the current user_id
-    best_alpha = get_alpha(df)
     # Add the RPE column to the df DataFrame
     df = add_rpe(df, best_alpha)
     
@@ -84,6 +89,7 @@ for (id in unique_users) {
       stimulus = df$stimulus,
       outcome = df$outcome,
       rpe = df$RPE,
+      best_alpha = best_alpha,
       happiness = df$happiness,
       happiness_hat = happiness_hat
     )
@@ -93,14 +99,21 @@ for (id in unique_users) {
   }
 }
 
+
 glimpse(final_df)
 
-plot(density(final_df$happiness))
+hist(final_df$happiness)
 
 hist(final_df$happiness_hat)
 
+# Whether alpha is below 0.05 or above does not change the fit of
+# happiness_hat to happiness.
+good_alpha_df <- final_df[final_df$best_alpha > 0.05, ]
+bad_alpha_df <- final_df[final_df$best_alpha <= 0.05, ]
+
+
 # Calculate mean and standard error of the mean (SEM)
-foo <- final_df |> 
+for_plot_df <- final_df |> 
   # dplyr::filter(ema_session == 12) |> 
   group_by(reversal, trial) |> 
   summarize(
@@ -110,23 +123,43 @@ foo <- final_df |>
     h_hat_sem = sd(happiness_hat, na.rm = TRUE) / sqrt(n())
   ) |> 
   ungroup()
-foo$reversal <- as.factor(foo$reversal)
+for_plot_df$reversal <- as.factor(for_plot_df$reversal)
 
 # Create the plot
-foo |> 
+for_plot_df |> 
   ggplot(aes(x=trial)) +
-  geom_line(aes(y=h), color = "blue") +  # Line for h
+  geom_line(aes(y=h), color = viridis(3)[1]) +  # Line for h
   geom_ribbon(aes(ymin = h - h_sem, ymax = h + h_sem), alpha = 0.2) +  # Ribbon for h
-  geom_line(aes(y=h_hat), color = "red") +  # Line for h_hat
+  geom_line(aes(y=h_hat), color = viridis(3)[2]) +  # Line for h_hat
   geom_ribbon(aes(ymin = h_hat - h_hat_sem, ymax = h_hat + h_hat_sem), alpha = 0.2, fill = "red") +  # Ribbon for h_hat
-  facet_wrap(~ reversal)
+  facet_wrap(~ reversal) +
+  theme_default()  # Apply the bayesplot theme
 
 
+# Plot for a single user_id
+for_plot_df <- final_df |> 
+  dplyr::filter(user_id == 3881466599) |> 
+  group_by(reversal, trial) |> 
+  summarize(
+    h = mean(happiness, trim = 0.1, na.rm = TRUE),
+    h_hat = mean(happiness_hat, trim = 0.1, na.rm = TRUE)
+  ) |> 
+  ungroup()
+for_plot_df$reversal <- as.factor(for_plot_df$reversal)
+
+# Create the plot
+for_plot_df %>%
+  ggplot(aes(x=trial)) +
+  geom_line(aes(y=h), color = viridis(3)[1]) +  # Line for h
+  geom_line(aes(y=h_hat), color = viridis(3)[2]) +  # Line for h_hat
+  facet_wrap(~ reversal) +
+  theme_default()  # Apply the bayesplot theme
 
 
+# Correlation empirical vs predicted happiness
 cor.test(
   final_df$happiness, final_df$happiness_hat, 
-  na.action=na.omit, method = "spearman"
+  na.action=na.omit, method = "pearson"
 )
 
 

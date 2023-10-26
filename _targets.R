@@ -13,6 +13,9 @@ suppressPackageStartupMessages({
   library("tidyverse")
   library("brms")
   library("mice")
+  library("parallel")
+  library("viridis")
+  library("bayesplot") 
 })
 
 
@@ -21,7 +24,8 @@ tar_option_set(
   # packages that your targets need to run
   packages = c(
     "here", "tarchetypes", "tidyverse", "mice", "brms", "quarto", "bayesplot", 
-    "effectsize", "sjstats", "sjPlot", "sjmisc", "emmeans"), 
+    "effectsize", "sjstats", "sjPlot", "sjmisc", "emmeans", "parallel", 
+    "viridis", "bayesplot"), 
   format = "rds", # default storage format
   seed = 12345
   # Set other options as needed.

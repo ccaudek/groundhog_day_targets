@@ -33,59 +33,76 @@ remove_outliers <- function(my_vector) {
 #' @returns A data frame.
 #' 
 get_data <- function(file_path) {
-  
+
   # file_path <- here::here("data", "prep", "groundhog_all_clean.RDS")
-  d1 <- readRDS(file_path) 
-  
+  d1 <- readRDS(file_path)
+
+  if ("date" %in% names(d1)) {
+    d1$date <- as.Date(d1$date)
+  }
+
   d1$user_id <- as.numeric(d1$user_id)
-  
+
   # Remove user_id == NA.
   d2 <- d1 |>
     dplyr::filter(!is.na(user_id))
-  
+
   # user_id with convergence problems.
   bad_ids <- c(
-    3338029881, 3665345709, 3248648540, 3668615349, 3456996255, 
+    3338029881, 3665345709, 3248648540, 3668615349, 3456996255,
     3475648095, 3497824506, 3888185906, 3667000898
   )
-  
+
   # Remove bad user_id.
   d3 <- d2[!(d2$user_id %in% bad_ids), ]
-  
+
   # table(d3$ema_number)
-  #    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17 
-  # 6450 6450 6450 6450 6090 5820 5550 5250 4890 4170 3600 2760 1890  390   60   30   30 
-  
+  #    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17
+  # 6450 6450 6450 6450 6090 5820 5550 5250 4890 4170 3600 2760 1890  390   60   30   30
+
   # Remove the last sessions having only few participants.
-  d4 <- d3 |> 
+  d4 <- d3 |>
     dplyr::filter(ema_number < 13)
-  
-  # Compute ema_number (rank-order of session for each participant) and 
+
+  # Compute ema_number (rank-order of session for each participant) and
   # standardize instant_mood, mood_pre, mood_post, and control by user_id.
-  d5 <- d4 |> 
-    group_by(user_id) |> 
-    arrange(date) |>  
+  d5 <- d4 |>
+    group_by(user_id) |>
+    arrange(date) |>
     mutate(
       ema_number = dense_rank(date),
       zmoodpre = as.vector(scale(mood_pre, center = TRUE, scale = TRUE)),
       zcontrol = as.vector(scale(control, center = TRUE, scale = TRUE)),
       zim = as.vector(scale(instant_mood, center = TRUE, scale = TRUE))
-    ) |> 
+    ) |>
     ungroup()
-  
+
   # For some user_id, control has the same value in all EMA sessions and,
   # therefore, zcontrol is NA. Replace these NAs with 0.
   d5$zcontrol <- ifelse(is.na(d5$zcontrol), 0, d5$zcontrol)
-  
+
+  # # Discard the first session (i.e., ema_number == 1) for each participant.
+  # d5_filtered <- d5 %>%
+  #   dplyr::filter(ema_number != 1)
+  # 
+  # # Recompute ema_number starting from 1 for each participant.
+  # d5_recomputed <- d5_filtered %>%
+  #   dplyr::group_by(user_id) %>%
+  #   dplyr::arrange(date) %>%
+  #   dplyr::mutate(
+  #     ema_number = dense_rank(date)
+  #   ) %>%
+  #   dplyr::ungroup()
+
   # Select the variables used for the momentary mood modeling.
-  d6 <- d5 |> 
+  d6 <- d5 |>
     dplyr::select(
       instant_mood, feedback, trial, user_id, mood_pre, control, mood_post,
-      is_reversal, is_target_chosen, ema_number, zim, zmoodpre, zcontrol, 
+      is_reversal, is_target_chosen, ema_number, zim, zmoodpre, zcontrol,
       date
     )
-  
-  d6
+
+  return(d6)
 }
 
 
@@ -134,61 +151,51 @@ get_params_happiness_model <- function(df, user_id_codes) {
 #' 
 #' @param id The string `user-id` for a single participant. 
 #' @param dat A data frame with the complete data set.
-# Define function to process a single user
+#' 
 process_user <- function(id, dat) {
+  # Set random seed for reproducibility
   set.seed(12345)
-
-  onesubj_data <- dat |>
-    dplyr::filter(user_id == id)
-
+  
+  # Filter data for the current user_id
+  onesubj_data <- dat %>% dplyr::filter(user_id == id)
+  
+  # Compute best_alpha once for each user_id
+  best_alpha <- get_alpha_all_sessions(onesubj_data)
+  
+  # Count the number of unique EMA episodes for this user
   n_ema_episodes <- length(unique(onesubj_data$ema_number))
-
+  
+  # Initialize the list to hold results
   par_list <- list()
-
-  for (i in seq_len(n_ema_episodes)) {
-    ema_session <- onesubj_data |>
-      dplyr::filter(ema_number == i) |>
+  
+  # Function to process a single EMA session
+  process_ema_session <- function(i) {
+    ema_session <- onesubj_data %>%
+      dplyr::filter(ema_number == i) %>%
       dplyr::select(
         user_id, ema_number, trial, is_target_chosen, is_reversal,
         feedback, zim, zmoodpre, zcontrol
       )
-
-    # Create a new data frame with all the required information for one single
-    # session of the current participant.
+    
+    # Create a new data frame with all the required information for one single session
     df <- data.frame(
       trial = ema_session$trial,
-      stimulus = ifelse(
-        ema_session$is_target_chosen == 0, -1, ema_session$is_target_chosen
-      ), # 1 for stimulus A, -1 for stimulus B
-      reversal = ifelse(
-        ema_session$is_reversal == "yes",
-        c(rep(0, 15), 1, rep(0, 14)),
-        rep(0, 30)
-      ), # not used
+      stimulus = ifelse(ema_session$is_target_chosen == 0, -1, ema_session$is_target_chosen),
+      reversal = ifelse(ema_session$is_reversal == "yes", c(rep(0, 15), 1, rep(0, 14)), rep(0, 30)),
       outcome = ifelse(ema_session$feedback == 0, -1, ema_session$feedback),
-      delta_p = ifelse(
-        ema_session$is_reversal == "yes",
-        c(rep(0, 15), 0.6, rep(0, 14)),
-        rep(0, 30)
-      ), # not used
-      happiness = ema_session$zim, # standardized by user_id
-      zmoodpre = ema_session$zmoodpre, # standardized by user_id
-      zcontrol = ema_session$zcontrol # standardized by user_id
+      delta_p = ifelse(ema_session$is_reversal == "yes", c(rep(0, 15), 0.6, rep(0, 14)), rep(0, 30)),
+      happiness = ema_session$zim,
+      zmoodpre = ema_session$zmoodpre,
+      zcontrol = ema_session$zcontrol
     )
-
-    # Get alpha for a single EMA session and for the current user_id
-    best_alpha <- get_alpha(df)
-
-    # Add the RPE column to the df data frame
-    df <- add_rpe(df, best_alpha)
-
-    # Estimate the parameters of the momentary happiness model for the current
-    # EMA session (30 trials).
-    # Initial guesses for parameters w0, w1, w2, w3, w4, w5, and gamma.
-    init_params <- c(0, 0, 0, 0, 0, 0, 0.5)
-
     
-    # Wrap optimization in tryCatch()
+    # Add the RPE column using the pre-computed best_alpha
+    df <- add_rpe(df, best_alpha)
+    
+    # Initial parameter estimates
+    init_params <- c(0, 0, 0, 0, 0, 0, 0.5)
+    
+    # Optimization with try-catch
     opt_result <- tryCatch(
       {
         optim(init_params, nll, data = df)
@@ -198,34 +205,37 @@ process_user <- function(id, dat) {
         return(NULL)
       }
     )
-    # Save results in mle_params
+    
+    # Extract the parameters or set them to NA if optimization failed
     if (is.null(opt_result)) {
       mle_params <- rep(NA, length(init_params))
     } else {
       mle_params <- opt_result$par
     }
-    # add further information
+    
+    # Create the output vector
     out <- c(
       mle_params,
-      ifelse(unique(ema_session$is_reversal) == "yes", 1, 0), # is_reversal
-      i, # ema_number
-      id, # user_id
-      best_alpha # alpha
+      ifelse(unique(ema_session$is_reversal) == "yes", 1, 0),
+      i,
+      id,
+      best_alpha
     )
-
-    par_list[[i]] <- out
+    
+    return(out)
   }
-
-  # Convert list to a data frame
+  
+  # Parallelize the loop using mclapply
+  par_list <- mclapply(seq_len(n_ema_episodes), process_ema_session, mc.cores = 4)
+  
+  # Convert the list to a data frame
   par_df <- do.call(rbind, par_list)
   par_df <- as.data.frame(par_df)
   colnames(par_df) <- c(
     "w0", "w1", "w2", "w3", "w4", "w5", "gamma", 
     "is_reversal", "ema_number", "user_id", "alpha"
   )
-
-  # cat(i, 'user_id:', unique(onesubj_data$user_id), '\n')
-
+  
   return(par_df)
 }
 
@@ -274,6 +284,67 @@ get_alpha <- function(df) {
     upper = 1
   )
 
+  best_alpha <- result$par
+  best_alpha
+}
+
+
+#' get_alpha_all_sessions() ----------------------------------------------------
+#' 
+#' @description
+#' Compute alpha for all session of the current user_id.
+#' @param df the data frame for a single EMA session of the current user_id. 
+#' @return alpha
+#' 
+get_alpha_all_sessions <- function(onesubj_data) {
+  
+  # Create a new data frame with all the required information for the current 
+  # participant.
+  df <- data.frame(
+    trial = onesubj_data$trial,
+    # 1 for stimulus "same action", -1 for stimulus "different action"
+    stimulus = ifelse(
+      onesubj_data$is_target_chosen == 0, -1, onesubj_data$is_target_chosen
+    ), 
+    outcome = ifelse(onesubj_data$feedback == 0, -1, onesubj_data$feedback)
+  )
+  
+  neg_log_likelihood <- function(alpha, df) {
+    predictions <- list("1" = 0, "-1" = 0)
+    nll <- 0
+    
+    for (i in 1:nrow(df)) {
+      row <- df[i, ]
+      stimulus <- as.character(row$stimulus)
+      outcome <- row$outcome
+      
+      prediction <- predictions[[stimulus]]
+      
+      # Calculate RPE
+      rpe <- outcome - prediction
+      
+      # Update prediction for the stimulus
+      new_prediction <- prediction + alpha * rpe
+      
+      # Store the new prediction back into the list
+      predictions[[stimulus]] <- new_prediction
+      
+      # Accumulate the negative log-likelihood (using Gaussian distribution for simplicity)
+      nll <- nll - log(dnorm(outcome, mean = prediction, sd = 1))
+    }
+    
+    return(nll)
+  }
+  
+  result <- optim(
+    par = 0.01, # initial value for alpha
+    fn = neg_log_likelihood,
+    df = df,
+    method = "Brent",
+    lower = 0,
+    upper = 1
+  )
+  
   best_alpha <- result$par
   best_alpha
 }
@@ -394,6 +465,7 @@ nll <- function(params, data) {
 #' @return A data frame.
 #' 
 clean_params_happiness_model <- function(params_happiness_df) {
+  
   # Outlier detection and multiple imputation of the parameters of the
   # momentary happiness model's parameters.
   df <- impute_outliers_params_happiness(params_happiness_df)
@@ -426,7 +498,11 @@ clean_params_happiness_model <- function(params_happiness_df) {
 #' @return The imputed params_happiness_df data frame.
 #' 
 impute_outliers_params_happiness <- function(params_happiness_df) {
+  PROB <- 0.99
+  IMPUTATION_M <- 5
+  
   set.seed(123)
+  
   # Step 1: Detect Outliers
   params_values <- params_happiness_df %>%
     dplyr::select(w0, w1, w2, w3, w4, w5, gamma)
@@ -440,7 +516,7 @@ impute_outliers_params_happiness <- function(params_happiness_df) {
     cov = params_cov
   )
 
-  cutoff <- qchisq(p = 0.99, df = ncol(params_values[, 1:7]))
+  cutoff <- qchisq(p = PROB, df = ncol(params_values[, 1:7]))
 
   params_values <- params_values %>%
     mutate(is_outlier = ifelse(mdist > cutoff, 1, 0))
@@ -459,7 +535,9 @@ impute_outliers_params_happiness <- function(params_happiness_df) {
       w0, w1, w2, w3, w4, w5, gamma, is_reversal, ema_number, alpha,
       zmoodpre, zcontrol
     )
-  imputed_data <- mice(temp, m = 5, maxit = 50, method = "pmm", seed = 500)
+  imputed_data <- mice(
+    temp, m = IMPUTATION_M, maxit = 50, method = "pmm", seed = 500
+  )
   completed_data <- complete(imputed_data, 1) # using the first imputed dataset
 
   params_happiness_df[, names(completed_data)] <- completed_data
@@ -513,4 +591,7 @@ impute_outliers_mood <- function(params_happiness_df) {
   
   return(params_happiness_df)
 }
+
+
+# eof ----
 
