@@ -6,7 +6,6 @@
 # ema_number (nrow = 2131)
 # The tar_load() command is necessary only for debugging.
 tar_load(params_happiness_clean_df)
-
 tar_load(prl_df)
 
 # Ungroup (otherwise there will be an error!) and change name 
@@ -74,7 +73,7 @@ for (id in unique_users) {
     
     subj_session_params <- params |> 
       dplyr::filter(user_id == subj_code & ema_number == i) |> 
-      dplyr::select("w0", "w1", "w2", "w3", "w4", "w5", "gamma")
+      dplyr::select("w0", "w1", "w2", "w3", "w4", "w5", "w6", "gamma")
     
     happiness_hat <- compute_predicted_happiness(
       subj_session_params, df
@@ -163,22 +162,215 @@ cor.test(
 )
 
 
+
+
+
+
+
+
+
+
 fm <- brm(
-  mood_dif ~ mood_pre + environment + (w1 + w2 + w3 + w4 + w5) +
-    (mood_pre + environment + (w1 + w2 + w3 + w4 + w5) | user_id / ema_number),
+  mood_dif ~ mood_pre + environment + (w0 + w1 + w2 + w3 + w4 + w5 + w6) +
+    (mood_pre + environment | user_id / ema_number),
   data = params_happiness_clean_df,
   family = student(),
-  backend = "cmdstanr"
+  algorithm = "meanfield"
+  #backend = "cmdstanr"
 )
 pp_check(fm) + xlim(-80, 80)
+bayes_R2(fm)
+performance::r2_bayes(fm)
 summary(fm)
-conditional_effects(fm, "w1")
+conditional_effects(fm, "w0")
 conditional_effects(fm, "environment")
 conditional_effects(fm, "mood_pre")
 
 
 performance::r2_bayes(fm)
 
+temp <- prl_df
+
+temp1 <- temp[temp$is_reversal == "no" & temp$ema_number < 13, ]
+temp1$ses <- as.vector(scale(temp1$ema_number))
+temp1$tr <- as.vector(scale(temp1$trial))
+temp1$im <- as.vector(scale(temp1$instant_mood))
+
+
+bysubj_params_df <- params_happiness_clean_df |>
+  dplyr::select(
+    "w0", "w1", "w2", "w3", "w4",
+    "w5", "w6", "gamma", "is_reversal", "ema_number",
+    "user_id", "alpha", "environment"
+  ) 
+bysubj_params_df$is_reversal <- ifelse(
+  bysubj_params_df$is_reversal == 1, "yes", "no"
+)
+
+mydat <- left_join(
+  prl_df, bysubj_params_df, by = c("user_id", "ema_number", "is_reversal")
+)
+
+
+stable_df <- mydat |> 
+  dplyr::filter(is_reversal == "no")
+
+volatile_df <- mydat |> 
+  dplyr::filter(is_reversal == "yes")
+
+volatile_df$change_point <- ifelse(volatile_df$trial > 15, 1, 0)
+
+fit0 <- brm(
+  instant_mood ~ 1 * change_point + trial * change_point +
+    (1 + trial | user_id / ema_number), 
+  data = volatile_df,
+  family = student(), #cumulative("logit"),
+  #algorithm = "meanfield",
+  backend = "cmdstanr",
+  cores = 4
+  #iter = 4000,
+)
+
+pp_check(fit0) # + xlim(-4, 4)
+bayes_R2(fit0)
+summary(fit0)
+conditional_effects(fit0, "trial")
+
+
+fit1 <- brm(
+  instant_mood ~ 1 + trial + 
+    (1 + trial | user_id / ema_number), 
+  data = stable_df,
+  family = cumulative("logit"),
+  algorithm = "meanfield",
+  # backend = "cmdstanr",
+  cores = 4
+)
+
+pp_check(fit1) # + xlim(-4, 4)
+bayes_R2(fit1)
+summary(fit1)
+conditional_effects(fit1, "trial")
+conditional_effects(fit1, "tr")
+
+
+fit2 <- brm(
+  instant_mood ~ 1 + 
+    w0 + w1 + w2 + w3 + w4 + w5 + w6 + 
+    (1 + trial | user_id / ema_number / trial), 
+  data = stable_df,
+  family = cumulative("logit"),
+  algorithm = "meanfield",
+  # backend = "cmdstanr",
+  cores = 4
+)
+
+pp_check(fit2) # + xlim(-4, 4)
+bayes_R2(fit2)
+summary(fit2)
+conditional_effects(fit2, "w0")
+conditional_effects(fit2, "w1")
+conditional_effects(fit2, "w3")
+conditional_effects(fit2, "w4")
+conditional_effects(fit2, "w5")
+conditional_effects(fit2, "w6")
+
+
+stable_emanum_df <- stable_df |> 
+  group_by(user_id, ema_number) |> 
+  summarize(
+    instant_mood = mean(instant_mood),
+    w0 = mean(w0), 
+    w1 = mean(w1), 
+    w2 = mean(w2), 
+    w3 = mean(w3), 
+    w4 = mean(w4), 
+    w5 = mean(w5), 
+    w6 = mean(w6),
+    gamma = mean(gamma)
+  ) |> 
+  ungroup()
+
+# Only result: the weight given to the outcomes increaes with sessions.
+
+fit4 <- brm(
+  w0 ~ 1 + ema_number + 
+    (1 + ema_number | user_id), 
+  data = mydat[mydat$is_reversal == "no", ],
+  family = student(),
+  algorithm = "meanfield",
+  # backend = "cmdstanr",
+  cores = 4
+)
+pp_check(fit4) + xlim(-2, 2)
+bayes_R2(fit4)
+summary(fit4)
+conditional_effects(fit4, "ema_number")
+
+
+delta_t <-
+  # extracting posterior samples from bmod5
+  posterior_samples(fit1, pars = c("^b_", "sd_", "sigma") ) %>% # taking the square of each variance component
+  mutate_at(.vars = 6:9, .funs = funs(.^2) ) %>%
+  # dividing the slope estimate by the square root of the sum of # all variance components
+  mutate(delta = b_tr / sqrt(rowSums(.[6:9]) ) )
+
+mean(delta_t$delta)
+
+
+
+
+
+
+
+
+temp1 <- prl_df
+
+temp1$ses <- as.vector(scale(temp1$ema_number))
+temp1$tr <- as.vector(scale(temp1$trial))
+temp1$im <- as.vector(scale(temp1$instant_mood))
+
+temp1$tr_segment1 <- ifelse(temp1$is_reversal == 1 & temp1$tr <= 15, temp1$tr, 0)
+temp1$tr_segment2 <- ifelse(temp1$is_reversal == 1 & temp1$tr > 15, temp1$tr - 15, 0)
+
+
+
+fit1 <- brm(
+  instant_mood ~ 
+    1 +
+    tr * (1 - is_reversal) +  # Effect of tr when is_reversal is 0
+    tr_segment1 * is_reversal +  # Effect of tr_segment1 when is_reversal is 1
+    tr_segment2 * is_reversal +  # Effect of tr_segment2 when is_reversal is 1
+    (1 + tr | user_id / ses),
+  data = temp1,
+  family = cumulative("logit"),
+  algorithm = "meanfield",
+  cores = 4,
+  prior = c(
+    prior(normal(0, 4), class = "Intercept"),
+    prior(normal(0, 4), class = "b")
+  )
+)
+
+
+
+
+
+
+# Extract posterior samples
+post_samples <- posterior_samples(fit1, pars = "b_tr")
+
+
+# Calculate the mean of the posterior samples for 'tr'
+mean_tr <- mean(post_samples$b_tr)
+
+# Calculate the pooled standard deviation of the outcome variable
+# You should calculate this on your original data (temp1 in your case)
+pooled_sd <- sd(temp1$instant_mood)
+
+# Calculate Cohen's d
+cohen_d <- mean_tr / pooled_sd
+cohen_d
 
 #### QUEST
 

@@ -16,6 +16,7 @@ suppressPackageStartupMessages({
   library("parallel")
   library("viridis")
   library("bayesplot") 
+  library("cmdstanr")
 })
 
 
@@ -25,7 +26,7 @@ tar_option_set(
   packages = c(
     "here", "tarchetypes", "tidyverse", "mice", "brms", "quarto", "bayesplot", 
     "effectsize", "sjstats", "sjPlot", "sjmisc", "emmeans", "parallel", 
-    "viridis", "bayesplot"), 
+    "viridis", "bayesplot", "cmdstanr"), 
   format = "rds", # default storage format
   seed = 12345
   # Set other options as needed.
@@ -38,6 +39,7 @@ options(clustermq.scheduler = "multicore")
 # Install packages {{future}}, {{future.callr}}, and {{future.batchtools}} to allow use_targets() to configure tar_make_future() options.
 
 # Run the R scripts in the R/ folder with your custom functions:
+# tar_source(here::here("R", "funs", "funs_mood_modeling.R"))
 tar_source(here::here("R", "funs", "funs_mood_modeling.R"))
 tar_source(here::here("R", "funs", "funs_brms.R"))
 tar_source(here::here("R", "funs", "funs_quest.R"))
@@ -117,7 +119,6 @@ list(
   
 # close list  
 )
-
 
 
 
