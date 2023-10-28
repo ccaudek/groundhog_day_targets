@@ -1,5 +1,7 @@
-# Functions for estimating the parameters of the momentary happiness model 
-# for the data of the PRL task of the Groundhog Day project.
+#' Groundhog Day project.
+#'
+#' Functions to estimate the parameters of the momentary happiness model 
+#' for the data of the PRL task of the Groundhog Day project.
 
 
 #' get_data() ------------------------------------------------------------------
@@ -76,8 +78,6 @@ get_params_happiness_model <- function(df, user_id_codes) {
       mood_pre = mean(mood_pre),
       mood_post = mean(mood_post),
       control = mean(control),
-      zmoodpre = mean(zmoodpre),
-      zcontrol = mean(zcontrol),
       .groups = 'drop'  # Drop the grouping
     )
   
