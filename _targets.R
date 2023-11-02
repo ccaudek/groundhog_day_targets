@@ -12,24 +12,35 @@ suppressPackageStartupMessages({
   library("tarchetypes")
   library("tidyverse")
   library("tidyr")
+  library("cmdstanr")
   library("brms")
+  library("posterior")
+  library("loo")
   library("mice")
   library("parallel")
-  library("viridis")
+  library("emmeans")
+  library("quarto")
   library("bayesplot") 
-  library("cmdstanr")
+  library("gridExtra")
+  library("ggdist")
+  library("viridis")
 })
 
+options(pillar.neg=FALSE)
+theme_set(bayesplot::theme_default(base_family = "sans"))
+
+SEED <- 48927 # set random seed for reproducibility
 
 # Set target options:
 tar_option_set(
   # packages that your targets need to run
   packages = c(
-    "here", "tarchetypes", "tidyverse", "tidyr", "mice", "brms", "quarto", 
-    "bayesplot", "effectsize", "sjstats", "sjPlot", "sjmisc", "emmeans", 
-    "parallel", "viridis", "bayesplot", "cmdstanr"), 
+    "here", "targets", "tarchetypes", "tidyverse", "tidyr", "cmdstanr", 
+    "brms", "posterior", "loo", "mice", "parallel", "emmeans", "quarto", 
+    "bayesplot", "gridExtra", "ggdist", "effectsize", "sjstats", "sjPlot", 
+    "sjmisc", "viridis"), 
   format = "rds", # default storage format
-  seed = 12345
+  seed = SEED
   # Set other options as needed.
 )
 
@@ -59,22 +70,16 @@ list(
   tar_target(prl_df, get_data(raw_df)),
 
   # Estimate the parameters of the momentary happiness model.
-  # nrow(params_happiness_df) = 2131
-  # names(params_happiness_df)
-  # [1] "w0"          "w1"          "w2"          "w3"          "w4"         
-  # [6] "w5"          "gamma"       "is_reversal" "ema_number"  "user_id"    
-  # [11] "alpha"       "mood_pre"    "mood_post"   "control"     "zmoodpre"   
-  # [16] "zcontrol"  
   tar_target(
     params_happiness_df,
     get_params_happiness_model(prl_df, unique(prl_df$user_id))
-  )
+  ),
 
-  # # Clean parameters of the momentary happiness model.
-  # tar_target(
-  #   params_happiness_clean_df,
-  #   clean_params_happiness_model(params_happiness_df)
-  # )
+  # Clean parameters of the momentary happiness model.
+  tar_target(
+    params_happiness_clean_df,
+    clean_params_happiness_model(params_happiness_df)
+  )
 
   # brms model for alpha and volatility
   # tar_target(

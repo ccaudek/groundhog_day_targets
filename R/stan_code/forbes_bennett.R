@@ -10,6 +10,300 @@ color_scheme_set("brightblue")
 cmdstan_version()
 
 
+# M6b is the best hierarchical model so far. The fit is almost decent. The 
+# problem is that it does not differentiate the reversal present vs. 
+# reversal absent sessions. Perhaps this depends on the hierarchical structure
+# of the model and the fact that
+
+prepare_stan_data <- function(df) {
+  
+  # Filter and select columns, sort by 'user_id' and 'trial'
+  prepared_df <- df %>%
+    select(user_id, ema_number, trial, happiness, RPE, outcome, stimulus, 
+           zmoodpre, zcontrol) %>%
+    arrange(user_id, ema_number, trial)
+  
+  # Convert 'user_id' to a numerical index for Stan
+  prepared_df$subj_idx <- as.integer(as.factor(prepared_df$user_id))
+  
+  # Number of unique subjects and unique subject-session combinations
+  N <- nrow(prepared_df)
+  S <- length(unique(prepared_df$user_id))
+  E <- nrow(unique(prepared_df[, c("user_id", "ema_number")]))
+  T <- max(prepared_df$trial)
+  
+  # Create the list to be passed to cmdstan
+  stan_data <- list(
+    N = N,
+    S = S,
+    E = E,
+    T = T,
+    subject = prepared_df$subj_idx,
+    session = prepared_df$ema_number,
+    outcome = as.vector(prepared_df$outcome),  # Not weighted
+    stimulus = as.vector(prepared_df$stimulus),  # Not weighted
+    RPE = as.vector(prepared_df$RPE),  # Not weighted
+    zmoodpre = prepared_df$zmoodpre,
+    zcontrol = prepared_df$zcontrol,
+    trial = prepared_df$trial,
+    happiness = prepared_df$happiness
+  )
+  
+  return(stan_data)
+}
+
+# Compile M6b
+sample_mod <- cmdstan_model(
+  "R/stan_code/M6b.stan", 
+  stanc_options = list("O1"),
+  force_recompile = TRUE
+)
+
+# Get the df of a subsample of user_id
+set.seed(1)
+unique_user_ids <- unique(all_data_df$user_id)
+# Randomly sample 2 user_ids
+random_user_ids <- sample(unique_user_ids, 3)
+random_user_ids
+# Filter the original data frame to include only these 10 user_ids
+filtered_df <- all_data_df %>% 
+  filter(user_id %in% random_user_ids)
+
+# data_for_stan <- prepare_stan_data(filtered_df)
+# only_rev_df <- all_data_df |> 
+#   dplyr::filter(is_reversal == "yes")
+
+# Use the complete data set
+data_for_stan <- prepare_stan_data(all_data_df)
+
+
+# Use Variational Inference
+sampled_vb <- sample_mod$variational(
+  data = data_for_stan,
+  seed = 123,
+  iter = 40000
+)
+
+# Sample with MCMC
+# sampled <- sample_mod$sample(
+#   data = data_for_stan,
+#   chains = 2,
+#   parallel_chains = 2,
+#   iter_sampling = 300,
+#   iter_warmup = 100,
+#   refresh = 20
+# )
+
+# Compute LOO ------------------------------------------------------------------
+
+log_lik_vb <- sampled_vb$draws("log_lik")  
+loo_vb <- loo(log_lik_vb)
+print(loo_vb)
+
+loo_vb <- sampled_vb$loo(cores = 4)
+print(loo_vb)
+
+# Get the summary --------------------------------------------------------------
+
+vb_summary <- sampled_vb$summary()
+
+# Convert the summary tibble to a data frame for easier indexing
+vb_summary_df <- as.data.frame(vb_summary)
+
+# Extract the 90% CIs for the mu_beta parameters (effects of the predictors)
+ci_lower_mu_beta <- 
+  vb_summary_df[grepl("mu_beta", vb_summary_df$variable), "q5"]
+ci_upper_mu_beta <- 
+  vb_summary_df[grepl("mu_beta", vb_summary_df$variable), "q95"]
+
+# Create a data frame to neatly store these values
+ci_df <- data.frame(
+  Predictor = c("Outcome", "Stimulus", "RPE", "ZMoodPre", "ZControl", "Trial"),
+  CI_Lower = ci_lower_mu_beta,
+  CI_Upper = ci_upper_mu_beta
+)
+
+# Print the data frame
+print(ci_df)
+
+sampled$diagnostic_summary()
+sampled$summary()
+
+# Plot -------------------------------------------------------------------------
+
+# Extract the Samples
+Y_pred_draws <- sampled_vb$draws(variables = "y_pred")
+# Convert to an array
+Y_pred_array <- as.array(Y_pred_draws)
+
+# Compute the mode for each trial
+# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mlv(as.vector(x)))
+# Y_pred_mode <- apply(Y_pred_array, 3, function(x) median(as.vector(x)))
+# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mean(as.vector(x), trim=0.1))
+
+Y_pred <- colMeans(Y_pred_array)
+
+# Assume Y_observed is a vector of observed values
+comparison <- data.frame(
+  Y_observed = data_for_stan$happiness, 
+  Y_pred = Y_pred
+)
+
+cor(
+  comparison$Y_observed, comparison$Y_pred
+)
+
+
+all_data_df$happiness_hat <- Y_pred
+
+
+# Calculate mean and standard error of the mean (SEM)
+for_plot_df <- all_data_df |> 
+  group_by(is_reversal, trial) |> 
+  summarize(
+    h = mean(happiness, trim = 0.1, na.rm = TRUE),
+    h_hat = mean(happiness_hat, trim = 0.1, na.rm = TRUE),
+    h_sem = sd(happiness, na.rm = TRUE) / sqrt(n()),
+    h_hat_sem = sd(happiness_hat, na.rm = TRUE) / sqrt(n())
+  ) |> 
+  ungroup()
+for_plot_df$is_reversal <- as.factor(for_plot_df$is_reversal)
+
+# Create the plot
+for_plot_df |> 
+  ggplot(aes(x=trial)) +
+  geom_line(aes(y=h), color = viridis(3)[1], linewidth = 2) +  # Line for h
+  geom_ribbon(aes(ymin = h - h_sem, ymax = h + h_sem), alpha = 0.2) +  # Ribbon for h
+  geom_line(aes(y=h_hat), color = viridis(3)[2], linewidth = 1.0) +  # Line for h_hat
+  #geom_ribbon(aes(ymin = h_hat - h_hat_sem, ymax = h_hat + h_hat_sem), alpha = 0.2, fill = "red") +  # Ribbon for h_hat
+  facet_wrap(~ is_reversal) +
+  theme_default()  # Apply the bayesplot theme
+
+
+
+## NOT BAD!!!! Tue Oct 31 21:34:29 2023
+
+
+# Single session ---------------------------------------------------------------
+
+prepare_stan_data_single_session <- function(
+    df, target_user_id, target_ema_number) {
+  
+  # Filter data for a specific user_id and ema_number (session)
+  filtered_df <- df %>%
+    filter(user_id == target_user_id, ema_number == target_ema_number) %>%
+    select(trial, happiness, RPE, outcome, stimulus, zmoodpre, zcontrol) %>%
+    arrange(trial)
+  
+  # Number of observations in this session
+  N <- nrow(filtered_df)
+  
+  # Maximum trial number in this session
+  T <- max(filtered_df$trial)
+  
+  # Create the list to be passed to Stan
+  stan_data <- list(
+    N = N,
+    T = T,
+    outcome = as.vector(filtered_df$outcome),
+    stimulus = as.vector(filtered_df$stimulus),
+    RPE = as.vector(filtered_df$RPE),
+    zmoodpre = as.vector(filtered_df$zmoodpre),
+    zcontrol = as.vector(filtered_df$zcontrol),
+    trial = as.vector(filtered_df$trial),
+    happiness = as.vector(filtered_df$happiness)
+  )
+  
+  return(stan_data)
+}
+
+
+
+# Identify unique user_ids
+set.seed(1)
+unique_user_ids <- unique(all_data_df$user_id)
+# Randomly sample 2 user_ids
+random_user_ids <- sample(unique_user_ids, 3)
+random_user_ids
+# Filter the original data frame to include only these 10 user_ids
+filtered_df <- all_data_df %>% 
+  filter(user_id %in% random_user_ids)
+
+# data_for_stan <- prepare_stan_data(filtered_df)
+
+
+
+stan_data_single_session <- prepare_stan_data_single_session(
+  all_data_df, target_user_id = unique_user_ids[49], 
+  target_ema_number = 3)
+
+
+# Check with VI whether the model converges
+sampled_vb <- sample_mod$variational(
+  data = stan_data_single_session,
+  seed = 42,
+  iter = 40000
+)
+
+
+# Plot -------------------------------------------------------------------------
+
+# Extract the Samples
+Y_pred_draws <- sampled_vb$draws(variables = "y_pred")
+# Convert to an array
+Y_pred_array <- as.array(Y_pred_draws)
+
+# Compute the mode for each trial
+# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mlv(as.vector(x)))
+# Y_pred_mode <- apply(Y_pred_array, 3, function(x) median(as.vector(x)))
+# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mean(as.vector(x), trim=0.1))
+
+Y_pred <- colMeans(Y_pred_array)
+
+# Assume Y_observed is a vector of observed values
+comparison <- data.frame(
+  Y_observed = stan_data_single_session$happiness, 
+  Y_pred = Y_pred
+)
+
+cor(comparison$Y_observed, comparison$Y_pred)
+plot(1:30, comparison$Y_observed)
+points(1:30, comparison$Y_pred, type="l")
+
+
+
+
+# Calculate mean and standard error of the mean (SEM)
+for_plot_df <- all_data_df |> 
+  group_by(is_reversal, trial) |> 
+  summarize(
+    h = mean(happiness, trim = 0.1, na.rm = TRUE),
+    h_hat = mean(happiness_hat, trim = 0.1, na.rm = TRUE),
+    h_sem = sd(happiness, na.rm = TRUE) / sqrt(n()),
+    h_hat_sem = sd(happiness_hat, na.rm = TRUE) / sqrt(n())
+  ) |> 
+  ungroup()
+for_plot_df$is_reversal <- as.factor(for_plot_df$is_reversal)
+
+# Create the plot
+for_plot_df |> 
+  ggplot(aes(x=trial)) +
+  geom_line(aes(y=h), color = viridis(3)[1], linewidth = 2) +  # Line for h
+  geom_ribbon(aes(ymin = h - h_sem, ymax = h + h_sem), alpha = 0.2) +  # Ribbon for h
+  geom_line(aes(y=h_hat), color = viridis(3)[2], linewidth = 1.0) +  # Line for h_hat
+  #geom_ribbon(aes(ymin = h_hat - h_hat_sem, ymax = h_hat + h_hat_sem), alpha = 0.2, fill = "red") +  # Ribbon for h_hat
+  facet_wrap(~ is_reversal) +
+  theme_default()  # Apply the bayesplot theme
+
+
+# eof ----
+
+
+
+
+
+
+
 # M0 multiple subjects, only one session ---------------------------------------
 
 # Preparing the data for Stan in a more robust and efficient manner
@@ -274,36 +568,36 @@ all_data_df <- left_join(
 # }
 
 prepare_stan_data <- function(df) {
-
+  
   # Filter and select columns, sort by 'user_id' and 'trial'
   prepared_df <- df %>%
     select(user_id, ema_number, trial, instant_mood, RPE, outcome, stimulus, zmoodpre, zcontrol) %>%
     arrange(user_id, ema_number, trial)
-
+  
   # Convert 'user_id' to a numerical index for Stan
   prepared_df$subj_ix <- as.integer(as.factor(prepared_df$user_id))
-
+  
   # Number of unique subjects and trials per subject
   N <- n_distinct(prepared_df$user_id)
   T_per_subject <- max(prepared_df$trial)
   T <- nrow(prepared_df)
-
+  
   # Create a data frame that contains session-level information
   session_df <- prepared_df %>%
     select(user_id, subj_ix, ema_number) %>%
     distinct() %>%
     arrange(user_id, ema_number)
-
+  
   # Total number of sessions across all subjects
   S <- nrow(session_df)
-
+  
   # Subject index for each session
   session_subj <- session_df$subj_ix
   
   # Create a numerical index for ema_number
   prepared_df$session_ix <- as.integer(as.factor(prepared_df$ema_number))
   
-
+  
   # Create the list to be passed to cmdstan
   stan_data <- list(
     N = N,
@@ -320,7 +614,7 @@ prepare_stan_data <- function(df) {
     zcontrol = prepared_df$zcontrol,
     trial = prepared_df$trial
   )
-
+  
   return(stan_data)
 } #### good for M3
 
@@ -534,7 +828,7 @@ comparison <- data.frame(
 
 cor(
   comparison$Y_observed, comparison$Y_pred
-  )
+)
 
 
 filtered_df$happiness_hat <- Y_pred_mode
@@ -635,7 +929,7 @@ fit2r_vb <- mod2r$variational(
   data = stan_data, 
   output_samples = 5000, 
   algorithm = "fullrank"
-  )
+)
 
 fit2r_vb$summary()
 mcmc_hist(fit2r_vb$draws("beta_RPE"))
@@ -738,7 +1032,7 @@ no_reversal_df$scs <- as.vector(scale(no_reversal_df$scs_total_score))
 
 mod <- brm(
   happiness ~ 1 + scs * (w0 + w_outcome + w_stim + w_rpe + 
-    w_moodpre + w_control + w_ntrial) + 
+                           w_moodpre + w_control + w_ntrial) + 
     (1 + w0 + w_outcome + w_stim + w_rpe + 
        w_moodpre + w_control + w_ntrial | user_id) + (1 | ema_number),
   family = student(),
@@ -811,313 +1105,4 @@ conditional_effects(mod3, "w_moodpre:scs")
 conditional_effects(mod3, "w_control:scs")
 conditional_effects(mod3, "w_ntrial:scs")
 
-
-
-################################################################################
-
-
-
-prepare_stan_data <- function(df) {
-  
-  # Filter and select columns, sort by 'user_id' and 'trial'
-  prepared_df <- df %>%
-    select(user_id, ema_number, trial, happiness, RPE, outcome, stimulus, 
-           zmoodpre, zcontrol) %>%
-    arrange(user_id, ema_number, trial)
-  
-  # Convert 'user_id' to a numerical index for Stan
-  prepared_df$subj_idx <- as.integer(as.factor(prepared_df$user_id))
-  
-  # Number of unique subjects and unique subject-session combinations
-  N <- nrow(prepared_df)
-  S <- length(unique(prepared_df$user_id))
-  E <- nrow(unique(prepared_df[, c("user_id", "ema_number")]))
-  T <- max(prepared_df$trial)
-  
-  # Create the list to be passed to cmdstan
-  stan_data <- list(
-    N = N,
-    S = S,
-    E = E,
-    T = T,
-    subject = prepared_df$subj_idx,
-    session = prepared_df$ema_number,
-    outcome = as.vector(prepared_df$outcome),  # Not weighted
-    stimulus = as.vector(prepared_df$stimulus),  # Not weighted
-    RPE = as.vector(prepared_df$RPE),  # Not weighted
-    zmoodpre = prepared_df$zmoodpre,
-    zcontrol = prepared_df$zcontrol,
-    trial = prepared_df$trial,
-    happiness = prepared_df$happiness
-  )
-  
-  return(stan_data)
-}
-
-
-
-sample_mod <- cmdstan_model(
-  "R/stan_code/M6b.stan", 
-  stanc_options = list("O1"),
-  force_recompile = TRUE
-)
-
-# Identify unique user_ids
-set.seed(1)
-unique_user_ids <- unique(all_data_df$user_id)
-# Randomly sample 2 user_ids
-random_user_ids <- sample(unique_user_ids, 3)
-random_user_ids
-# Filter the original data frame to include only these 10 user_ids
-filtered_df <- all_data_df %>% 
-  filter(user_id %in% random_user_ids)
-
-# data_for_stan <- prepare_stan_data(filtered_df)
-data_for_stan <- prepare_stan_data(all_data_df)
-
-
-# Check with VI whether the model converges
-sampled_vb <- sample_mod$variational(
-  data = data_for_stan,
-  seed = 123,
-  iter = 40000
-)
-
-# Compute LOO
-log_lik_vb <- sampled_vb$draws("log_lik")  
-loo_vb <- loo(log_lik_vb)
-print(loo_vb)
-
-# Get the summary
-vb_summary <- sampled_vb$summary()
-
-# Convert the summary tibble to a data frame for easier indexing
-vb_summary_df <- as.data.frame(vb_summary)
-
-# Extract the 90% CIs for the mu_beta parameters (effects of the predictors)
-ci_lower_mu_beta <- 
-  vb_summary_df[grepl("mu_beta", vb_summary_df$variable), "q5"]
-ci_upper_mu_beta <- 
-  vb_summary_df[grepl("mu_beta", vb_summary_df$variable), "q95"]
-
-# Create a data frame to neatly store these values
-ci_df <- data.frame(
-  Predictor = c("Outcome", "Stimulus", "RPE", "ZMoodPre", "ZControl", "Trial"),
-  CI_Lower = ci_lower_mu_beta,
-  CI_Upper = ci_upper_mu_beta
-)
-
-# Print the data frame
-print(ci_df)
-
-
-
-# Sample with MCMC
-sampled <- sample_mod$sample(
-  data = data_for_stan,
-  chains = 2,
-  parallel_chains = 2,
-  iter_sampling = 300,
-  iter_warmup = 100,
-  refresh = 20
-)
-
-sampled$diagnostic_summary()
-sampled$summary()
-
-# Compute LOO
-loo_m5 <- sampled$loo(cores = 4)
-print(loo_m3)
-
-summary_mod <- sampled$summary()
-summary_mod$variable
-summary(summary_mod$rhat)
-
-# Get the summary
-sampled_summary <- sampled$summary()
-
-# Convert the summary tibble to a data frame for easier indexing
-sampled_summary_df <- as.data.frame(sampled_summary)
-
-# Extract the 95% CIs for the mu_beta parameters (effects of the predictors)
-ci_lower_mu_beta <- sampled_summary_df[grepl("mu_beta", sampled_summary_df$variable), "q5"]
-ci_upper_mu_beta <- sampled_summary_df[grepl("mu_beta", sampled_summary_df$variable), "q95"]
-
-# Create a data frame to neatly store these values
-ci_df <- data.frame(
-  Predictor = c("Outcome", "Stimulus", "RPE", "ZMoodPre", "ZControl", "Trial"),
-  CI_Lower = ci_lower_mu_beta,
-  CI_Upper = ci_upper_mu_beta
-)
-
-# Print the data frame
-print(ci_df)
-
-
-
-# Plot -------------------------------------------------------------------------
-
-# Extract the Samples
-Y_pred_draws <- sampled_vb$draws(variables = "y_pred")
-# Convert to an array
-Y_pred_array <- as.array(Y_pred_draws)
-
-# Compute the mode for each trial
-# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mlv(as.vector(x)))
-# Y_pred_mode <- apply(Y_pred_array, 3, function(x) median(as.vector(x)))
-# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mean(as.vector(x), trim=0.1))
-
-Y_pred <- colMeans(Y_pred_array)
-
-# Assume Y_observed is a vector of observed values
-comparison <- data.frame(
-  Y_observed = data_for_stan$happiness, 
-  Y_pred = Y_pred
-)
-
-cor(
-  comparison$Y_observed, comparison$Y_pred
-)
-
-
-all_data_df$happiness_hat <- Y_pred
-
-
-# Calculate mean and standard error of the mean (SEM)
-for_plot_df <- all_data_df |> 
-  group_by(is_reversal, trial) |> 
-  summarize(
-    h = mean(happiness, trim = 0.1, na.rm = TRUE),
-    h_hat = mean(happiness_hat, trim = 0.1, na.rm = TRUE),
-    h_sem = sd(happiness, na.rm = TRUE) / sqrt(n()),
-    h_hat_sem = sd(happiness_hat, na.rm = TRUE) / sqrt(n())
-  ) |> 
-  ungroup()
-for_plot_df$is_reversal <- as.factor(for_plot_df$is_reversal)
-
-# Create the plot
-for_plot_df |> 
-  ggplot(aes(x=trial)) +
-  geom_line(aes(y=h), color = viridis(3)[1], linewidth = 2) +  # Line for h
-  geom_ribbon(aes(ymin = h - h_sem, ymax = h + h_sem), alpha = 0.2) +  # Ribbon for h
-  geom_line(aes(y=h_hat), color = viridis(3)[2], linewidth = 1.0) +  # Line for h_hat
-  #geom_ribbon(aes(ymin = h_hat - h_hat_sem, ymax = h_hat + h_hat_sem), alpha = 0.2, fill = "red") +  # Ribbon for h_hat
-  facet_wrap(~ is_reversal) +
-  theme_default()  # Apply the bayesplot theme
-
-
-
-## NOT BAD!!!! Tue Oct 31 21:34:29 2023
-
-
-# Single session
-
-prepare_stan_data_single_session <- function(
-    df, target_user_id, target_ema_number) {
-  
-  # Filter data for a specific user_id and ema_number (session)
-  filtered_df <- df %>%
-    filter(user_id == target_user_id, ema_number == target_ema_number) %>%
-    select(trial, happiness, RPE, outcome, stimulus, zmoodpre, zcontrol) %>%
-    arrange(trial)
-  
-  # Number of observations in this session
-  N <- nrow(filtered_df)
-  
-  # Maximum trial number in this session
-  T <- max(filtered_df$trial)
-  
-  # Create the list to be passed to Stan
-  stan_data <- list(
-    N = N,
-    T = T,
-    outcome = as.vector(filtered_df$outcome),
-    stimulus = as.vector(filtered_df$stimulus),
-    RPE = as.vector(filtered_df$RPE),
-    zmoodpre = as.vector(filtered_df$zmoodpre),
-    zcontrol = as.vector(filtered_df$zcontrol),
-    trial = as.vector(filtered_df$trial),
-    happiness = as.vector(filtered_df$happiness)
-  )
-  
-  return(stan_data)
-}
-
-
-
-# Identify unique user_ids
-set.seed(1)
-unique_user_ids <- unique(all_data_df$user_id)
-# Randomly sample 2 user_ids
-random_user_ids <- sample(unique_user_ids, 3)
-random_user_ids
-# Filter the original data frame to include only these 10 user_ids
-filtered_df <- all_data_df %>% 
-  filter(user_id %in% random_user_ids)
-
-# data_for_stan <- prepare_stan_data(filtered_df)
-
-
-
-stan_data_single_session <- prepare_stan_data_single_session(
-  all_data_df, target_user_id = unique_user_ids[49], 
-  target_ema_number = 3)
-
-
-# Check with VI whether the model converges
-sampled_vb <- sample_mod$variational(
-  data = stan_data_single_session,
-  seed = 42,
-  iter = 40000
-)
-
-
-# Plot -------------------------------------------------------------------------
-
-# Extract the Samples
-Y_pred_draws <- sampled_vb$draws(variables = "y_pred")
-# Convert to an array
-Y_pred_array <- as.array(Y_pred_draws)
-
-# Compute the mode for each trial
-# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mlv(as.vector(x)))
-# Y_pred_mode <- apply(Y_pred_array, 3, function(x) median(as.vector(x)))
-# Y_pred_mode <- apply(Y_pred_array, 3, function(x) mean(as.vector(x), trim=0.1))
-
-Y_pred <- colMeans(Y_pred_array)
-
-# Assume Y_observed is a vector of observed values
-comparison <- data.frame(
-  Y_observed = stan_data_single_session$happiness, 
-  Y_pred = Y_pred
-)
-
-cor(comparison$Y_observed, comparison$Y_pred)
-plot(1:30, comparison$Y_observed)
-points(1:30, comparison$Y_pred, type="l")
-
-
-
-
-# Calculate mean and standard error of the mean (SEM)
-for_plot_df <- all_data_df |> 
-  group_by(is_reversal, trial) |> 
-  summarize(
-    h = mean(happiness, trim = 0.1, na.rm = TRUE),
-    h_hat = mean(happiness_hat, trim = 0.1, na.rm = TRUE),
-    h_sem = sd(happiness, na.rm = TRUE) / sqrt(n()),
-    h_hat_sem = sd(happiness_hat, na.rm = TRUE) / sqrt(n())
-  ) |> 
-  ungroup()
-for_plot_df$is_reversal <- as.factor(for_plot_df$is_reversal)
-
-# Create the plot
-for_plot_df |> 
-  ggplot(aes(x=trial)) +
-  geom_line(aes(y=h), color = viridis(3)[1], linewidth = 2) +  # Line for h
-  geom_ribbon(aes(ymin = h - h_sem, ymax = h + h_sem), alpha = 0.2) +  # Ribbon for h
-  geom_line(aes(y=h_hat), color = viridis(3)[2], linewidth = 1.0) +  # Line for h_hat
-  #geom_ribbon(aes(ymin = h_hat - h_hat_sem, ymax = h_hat + h_hat_sem), alpha = 0.2, fill = "red") +  # Ribbon for h_hat
-  facet_wrap(~ is_reversal) +
-  theme_default()  # Apply the bayesplot theme
 

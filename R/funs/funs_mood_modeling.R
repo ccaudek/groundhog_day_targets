@@ -184,8 +184,6 @@ process_user <- function(id, dat) {
   return(result_df)
 }
 
-
-
 #' get_alpha() -----------------------------------------------------------------
 #' 
 #' @description
@@ -295,7 +293,6 @@ get_alpha_all_sessions <- function(onesubj_data) {
   best_alpha
 }
 
-
 #' add_rpe() -------------------------------------------------------------------
 #' 
 #' @description
@@ -340,7 +337,6 @@ add_rpe <- function(df, best_alpha) {
 
   df
 }
-
 
 # compute_predicted_happiness() ------------------------------------------------
 #' @description
@@ -404,7 +400,6 @@ nll <- function(params, data) {
   return(nll_value)
 }
 
-
 #' detect_outliers() -----------------------------------------------------------
 #' @description
 #' Helper function to detect outliers based on Mahalanobis distance
@@ -446,21 +441,39 @@ perform_imputation <- function(df, cols, m = 1, seed = 500) {
 #' clean_params_happiness_model() ----------------------------------------------
 #' @description
 #' Main function to clean parameters related to the happiness model
-#' 
+#'
 clean_params_happiness_model <- function(params_happiness_df) {
   
-  # Step 1: Detect and impute outliers for happiness parameters
-  outlier_cols1 <- c("w0", "w1", "w2", "w3", "w4", "w5", "w6", "gamma")
-  params_happiness_df <- 
-    impute_outliers_params_happiness(params_happiness_df, outlier_cols1)
+  # Helper function to rename MLE parameters
+  rename_mle_params <- function(df) {
+    df %>% 
+      rename(
+        w0 = mle_params_1,
+        w_outcome = mle_params_2,
+        w_stimulus = mle_params_3,
+        w_rpe = mle_params_4,
+        w_moodpre = mle_params_5,
+        w_control = mle_params_6,
+        w_trial = mle_params_7,
+        w_gamma = mle_params_8
+      )
+  }
   
-  # Step 2: Detect and impute outliers for mood and control variables
+  # Step 1: Unnest and rename MLE parameters
+  expanded_df <- params_happiness_df %>%
+    unnest_wider(mle_params, names_sep = "_") %>%
+    rename_mle_params()
+  
+  # Step 1.1: Impute outliers for MLE parameters
+  outlier_cols1 <- c("w0", "w_outcome", "w_stimulus", "w_rpe", "w_moodpre", "w_control", "w_trial", "w_gamma")
+  imputed_df1 <- impute_outliers_params_happiness(expanded_df, outlier_cols1)
+  
+  # Step 2: Impute outliers for mood and control variables
   outlier_cols2 <- c("mood_pre", "control", "mood_post")
-  params_happiness_df <- 
-    impute_outliers_mood(params_happiness_df, outlier_cols2)
+  imputed_df2 <- impute_outliers_mood(imputed_df1, outlier_cols2)
   
   # Step 3: Additional transformations
-  params_happiness_df <- params_happiness_df %>%
+  final_df <- imputed_df2 %>%
     group_by(user_id) %>%
     mutate(
       mood_dif = mood_post - mood_pre,
@@ -469,8 +482,9 @@ clean_params_happiness_model <- function(params_happiness_df) {
     ) %>%
     ungroup()
   
-  return(params_happiness_df)
+  return(final_df)
 }
+
 
 #' impute_outliers_params_happiness() ------------------------------------------
 #' @description
@@ -497,179 +511,6 @@ impute_outliers_mood <- function(df, cols) {
   df[cols] <- imputed_data
   return(df)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#' 
-#' 
-#' #' clean_params_happiness_model() ----------------------------------------------
-#' #' 
-#' #' @description
-#' #' Find outiers in the parameters of the momentary happiness model, replace
-#' #' them with NAs and perform multiple imputation.
-#' #' @param params_happiness_df A data frame.
-#' #' @return A data frame.
-#' #' 
-#' clean_params_happiness_model <- function(params_happiness_df) {
-#'   
-#'   # Outlier detection and multiple imputation of the parameters of the
-#'   # momentary happiness model's parameters.
-#'   df <- impute_outliers_params_happiness(params_happiness_df)
-#'   # Outlier detection and multiple imputation on the mood and control
-#'   # variables.
-#'   df1 <- impute_outliers_mood(df)
-#' 
-#'   # On the imputed data, compute mood_dif and mood_pre_cw.
-#'   df2 <- df1 |>
-#'     group_by(user_id) |>
-#'     mutate(
-#'       mood_dif = mood_post - mood_pre,
-#'       mood_pre_cw = mood_pre - mean(mood_pre, trim = 0.1)
-#'     ) |> 
-#'     ungroup()
-#' 
-#'   df2$environment <- ifelse(df2$is_reversal == 1, "Volatile", "Stable")
-#' 
-#'   return(df2)
-#' }
-#' 
-#' 
-#' #' impute_outliers_params_happiness() ------------------------------------------
-#' #' 
-#' #' @description
-#' #' Use Mahalanobis distance to identify outliers in the estimates of the 
-#' #' momentary happiness model's parameters. Replace outliers with NAs. Perform
-#' #' multiple imputation on the missing values. 
-#' #' @param params_happiness_df A data frame.
-#' #' @return The imputed params_happiness_df data frame.
-#' #' 
-#' impute_outliers_params_happiness <- function(params_happiness_df) {
-#'   PROB <- 0.99
-#'   IMPUTATION_M <- 5
-#'   
-#'   set.seed(123)
-#'   
-#'   # Step 1: Detect Outliers
-#'   params_values <- params_happiness_df %>%
-#'     dplyr::select(w0, w1, w2, w3, w4, w5, w6, gamma)
-#' 
-#'   params_center <- colMeans(params_values)
-#'   params_cov <- cov(params_values)
-#' 
-#'   params_values$mdist <- mahalanobis(
-#'     x = params_values,
-#'     center = params_center,
-#'     cov = params_cov
-#'   )
-#' 
-#'   cutoff <- qchisq(p = PROB, df = ncol(params_values[, 1:8]))
-#' 
-#'   params_values <- params_values %>%
-#'     mutate(is_outlier = ifelse(mdist > cutoff, 1, 0))
-#' 
-#'   outlier_indices <- which(params_values$is_outlier == 1)
-#' 
-#'   # Replace outliers with NA
-#'   params_happiness_df[
-#'     outlier_indices, c("w0", "w1", "w2", "w3", "w4", "w5", "w6", "gamma")
-#'   ] <- NA
-#' 
-#'   # Step 2: Multiple Imputation
-#'   # Select only the numeric variables of interest
-#'   temp <- params_happiness_df |>
-#'     dplyr::select(
-#'       w0, w1, w2, w3, w4, w5, w6, gamma, is_reversal, ema_number, alpha,
-#'       zmoodpre, zcontrol
-#'     )
-#'   imputed_data <- mice(
-#'     temp, m = IMPUTATION_M, maxit = 50, method = "pmm", seed = 500
-#'   )
-#'   completed_data <- complete(imputed_data, 1) # using the first imputed dataset
-#' 
-#'   params_happiness_df[, names(completed_data)] <- completed_data
-#' 
-#'   return(params_happiness_df)
-#' }
-#' 
-#' 
-#' #' impute_outliers_mood() ------------------------------------------------------
-#' #' 
-#' #' @description
-#' #' Outlier detection and multiple imputation for the mood and control variables.
-#' #' @param params_happiness_df A data frame.
-#' #' @return A data frame.
-#' #' 
-#' impute_outliers_mood <- function(params_happiness_df) {
-#'   set.seed(123)
-#'   # Step 1: Detect Outliers
-#'   mood_values <- params_happiness_df %>%
-#'     dplyr::select(mood_pre, control, mood_post)
-#'   
-#'   mood_center <- colMeans(mood_values)
-#'   mood_cov <- cov(mood_values)
-#'   
-#'   mood_values$mdist <- mahalanobis(
-#'     x = mood_values,
-#'     center = mood_center,
-#'     cov = mood_cov
-#'   )
-#'   
-#'   cutoff <- qchisq(p = 0.99, df = ncol(mood_values[, 1:3]))
-#'   
-#'   mood_values <- mood_values %>%
-#'     mutate(is_outlier = ifelse(mdist > cutoff, 1, 0))
-#'   
-#'   outlier_indices <- which(mood_values$is_outlier == 1)
-#'   
-#'   # Replace outliers with NA
-#'   params_happiness_df[
-#'     outlier_indices, c("mood_pre", "control", "mood_post")
-#'   ] <- NA
-#'   
-#'   # Step 2: Multiple Imputation
-#'   # Select only the numeric variables of interest
-#'   temp <- params_happiness_df |>
-#'     dplyr::select(mood_pre, control, mood_post)
-#'   imputed_data <- mice(temp, m = 5, maxit = 50, method = "pmm", seed = 500)
-#'   completed_data <- complete(imputed_data, 1) # using the first imputed dataset
-#'   
-#'   params_happiness_df[, names(completed_data)] <- completed_data
-#'   
-#'   return(params_happiness_df)
-#' }
 
 
 # eof ----

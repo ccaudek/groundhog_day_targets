@@ -1,19 +1,11 @@
-
-# Script for instant mood analysis
+# Script for the momentary mood analysis
 # Project: groundhog_day
 
-# Get estimates of the momentary happiness model for each user_id and
-# ema_number (nrow = 2131)
-# The tar_load() command is necessary only for debugging.
-# tar_load(params_happiness_clean_df)
-# tar_load(prl_df)
 
-
-
-tar_load(params_happiness_df)
+tar_load(params_happiness_clean_df)
 
 # Calculate mean and standard error of the mean (SEM)
-for_plot_df <- params_happiness_df |> 
+for_plot_df <- params_happiness_clean_df |> 
   group_by(is_reversal, trial) |> 
   summarize(
     h = mean(happiness, trim = 0.1, na.rm = TRUE),
@@ -37,6 +29,593 @@ for_plot_df |>
 
 
 
+
+# Increase of happiness within a session
+
+tar_load(params_happiness_clean_df)
+
+norev_df <- params_happiness_clean_df |> 
+  dplyr::filter(is_reversal == 0) 
+
+rev_df <- params_happiness_clean_df |> 
+  dplyr::filter(is_reversal == 1) 
+
+for_plot_df <- rev_df |> 
+  group_by(trial) |> 
+  summarize(
+    h = mean(happiness, trim = 0.1)
+  )
+
+plot(for_plot_df$trial, for_plot_df$h, type = 'l')
+
+rev_df$epoch <- ifelse(
+  rev_df$trial < 16, 0, 1
+)
+
+rev_df$t <- rev_df$trial - 16
+
+bysubj_rev_df <- rev_df |> 
+  group_by(user_id, epoch, t) |> 
+  summarize(
+    happiness = mean(happiness, trim = 0.1),
+  ) |> 
+  ungroup()
+
+# Convert factor 'epoch' to numeric if it's not already
+bysubj_rev_df$epoch <- as.numeric(as.character(bysubj_rev_df$epoch))
+
+# Assuming 't' is centered around 0, we create the new variables 
+# for the slopes
+bysubj_rev_df$trial_pre = ifelse(bysubj_rev_df$t < 0, bysubj_rev_df$t, 0)
+bysubj_rev_df$trial_post = ifelse(bysubj_rev_df$t >= 0, bysubj_rev_df$t, 0)
+
+# Now, we fit the model with brms using these new variables
+fit_rev <- brm(
+  bf(happiness ~ 1 + epoch * trial_pre + epoch * trial_post + 
+       (1 + epoch * trial_pre + epoch * trial_post | user_id)),
+  data = bysubj_rev_df,
+  family = gaussian(),
+  backend = "cmdstanr",
+  chains = 2,
+  iter = 1000,
+  # prior = c(
+  #   set_prior("normal(0, 5)", class = "b"), # Weakly informative prior for fixed effects
+  #   set_prior("cauchy(0, 2.5)", class = "sd", group = "user_id"), # Weakly informative prior for random effects sd
+  #   set_prior("lkj(2)", class = "cor", group = "user_id") # Weakly informative prior for random effects correlations
+  # ),
+  threads = threading(4)
+)
+
+pp_check(fit_rev) + xlim(-3, 3)
+
+summary(fit_rev)
+marginal_effects(fit_rev, "trial_pre")
+marginal_effects(fit_rev, "epoch")
+marginal_effects(fit_rev, "trial:epoch")
+
+
+r2_bayes(fit_rev)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+for_plot_df <- bysubj_rev_df |> 
+  group_by(trial) |> 
+  summarize(
+    h = mean(happiness, trim = 0.1)
+  )
+
+plot(for_plot_df$trial, for_plot_df$h, type = 'l')
+
+
+
+fit_norev <- brm(
+  happiness ~ 1 + trial + (1 + trial | user_id / ema_number),
+  data = norev_df,
+  family = gaussian(),
+  backend = "cmdstanr",
+  chains = 2,
+  iter = 500,
+  prior = c(
+    set_prior("normal(0, 5)", class = "b"), # Weakly informative prior for fixed effects
+    set_prior("cauchy(0, 2)", class = "sd") # Weakly informative prior for random effects
+  ),
+  # decomp = "QR",
+  # normalize = FALSE,
+  threads = threading(4)
+)
+pp_check(fit_norev) #+ xlim(-3, 3)
+
+summary(fit_norev)
+marginal_effects(fit_norev, "trial")
+
+r2_bayes(fit_norev)
+
+
+
+
+
+bysubj_rev_df <- rev_df |> 
+  group_by(user_id, trial) |> 
+  summarize(
+    happiness = mean(happiness, trim = 0.1),
+  ) |> 
+  ungroup()
+
+for_plot_df <- bysubj_rev_df |> 
+  group_by(trial) |> 
+  summarize(
+    h = mean(happiness, trim = 0.1)
+  )
+
+plot(for_plot_df$trial, for_plot_df$h, type = 'l')
+
+bysubj_rev_df$epoch <- ifelse(
+  bysubj_rev_df$trial < 16, 0, 1
+) |> 
+  as.factor()
+
+fit_rev <- brm(
+  happiness ~ 1 + epoch * trial + (1 + epoch * trial | user_id),
+  data = bysubj_rev_df,
+  family = student(),
+  backend = "cmdstanr",
+  chains = 2,
+  iter = 1000,
+  prior = c(
+    set_prior("normal(0, 5)", class = "b"), # Weakly informative prior for fixed effects
+    set_prior("cauchy(0, 5)", class = "sd") # Weakly informative prior for random effects
+  ),
+  threads = threading(4)
+)
+pp_check(fit_rev) + xlim(-3, 3)
+
+summary(fit_rev)
+marginal_effects(fit_rev, "trial")
+marginal_effects(fit_rev, "epoch")
+marginal_effects(fit_rev, "trial:epoch")
+
+
+r2_bayes(fit_rev)
+
+
+# Piecewise regression with Stan
+
+
+# Center the trial variable around the change point
+bysubj_rev_df$centered_trial <- bysubj_rev_df$trial - 16
+
+# Assuming 'centered_trial' is centered around 0, we create the new variables 
+# for the slopes
+bysubj_rev_df$trial_pre = 
+  ifelse(bysubj_rev_df$centered_trial < 0, bysubj_rev_df$centered_trial, 0)
+bysubj_rev_df$trial_post = 
+  ifelse(bysubj_rev_df$centered_trial >= 0, bysubj_rev_df$centered_trial, 0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Create an indicator variable for trials before and after the change point
+bysubj_rev_df$pre_change <- ifelse(bysubj_rev_df$trial < 16, 1, 0)
+bysubj_rev_df$post_change <- ifelse(bysubj_rev_df$trial >= 16, 1, 0)
+
+# Create the design matrix with centered trial
+# Since we're dealing with a piecewise regression, we don't need interaction with 'epoch'
+X_pre <- model.matrix(~ centered_trial * pre_change, bysubj_rev_df)
+X_post <- model.matrix(~ centered_trial * post_change, bysubj_rev_df)
+
+# Prepare the data for Stan
+stan_data <- list(
+  N = nrow(bysubj_rev_df),
+  Y = bysubj_rev_df$happiness,
+  trial = bysubj_rev_df$centered_trial,
+  N_subjects = length(unique(bysubj_rev_df$user_id)),
+  subject = as.integer(factor(bysubj_rev_df$user_id))  # Convert user_id to consecutive integers
+)
+
+
+# Compile M9_piecewise.stan
+sample_mod <- cmdstan_model(
+  "R/stan_code/M10.stan", 
+  stanc_options = list("O1"),
+  force_recompile = TRUE
+)
+
+# Use Variational Inference
+sampled_vb <- sample_mod$variational(
+  data = stan_data,
+  seed = 123,
+  iter = 40000
+)
+
+# Sample with MCMC
+sampled <- sample_mod$sample(
+  data = stan_data,
+  chains = 2,
+  parallel_chains = 2,
+  iter_sampling = 500,
+  iter_warmup = 100,
+  refresh = 20
+)
+
+vb_summary <- sampled_vb$summary()
+vb_summary$variable
+
+draws <- sampled_vb$draws(format = "df")
+
+
+# Identify all y_pred columns
+y_pred_columns <- grep("y_pred", names(draws), value = TRUE)
+
+# Pivot the data from wide to long format
+draws_long <- draws %>%
+  pivot_longer(cols = y_pred_columns, names_to = "trial", values_to = "y_pred") %>%
+  mutate(trial = readr::parse_number(trial)) # Extract the numeric part of the trial identifier
+
+
+
+predicted_Y <- draws$
+
+# Determine the number of draws per observation
+num_draws_per_obs <- nrow(draws) / nrow(stan_data)
+
+# Repeat the stan_data for each draw
+stan_data_long <- stan_data[rep(1:nrow(stan_data), each = num_draws_per_obs),]
+
+# Now combine the repeated stan_data with the draws
+combined_data <- cbind(stan_data_long, draws)
+
+
+
+
+# Create a new column for the combined effect
+draws$combined_effect <- draws$`b[2]` + draws$`b[3]`
+hist(draws$combined_effect, breaks=50, main="Posterior of Combined Effect of Trial after Change Point")
+
+hist(draws$intercept)
+
+
+draws <- sampled$draws(format = "df")
+
+# Create a new column for the combined effect
+draws$combined_effect <- draws$`b[2]` + draws$`b[3]`
+hist(draws$combined_effect, breaks=50, main="Posterior of Combined Effect of Trial after Change Point")
+
+
+
+
+
+
+
+
+# Define the known change point
+known_omega <- 16
+
+bform <- bf(
+  y ~ b0 + b1 * (trial - known_omega) * step(known_omega - trial) + 
+    b2 * (trial - known_omega) * step(trial - known_omega),
+  b0 + b1 + b2 ~ 1 + (1 | user_id)
+)
+
+df <- data.frame(
+  y = rnorm(330),
+  age = rep(0:10, 30),
+  person = rep(1:30, each = 11)
+)
+
+bprior <- prior(normal(0, 3), nlpar = "b0") +
+  prior(normal(0, 3), nlpar = "b1") +
+  prior(normal(0, 3), nlpar = "b2")
+
+make_stancode(bform, data = df, prior = bprior)
+
+
+
+
+
+
+
+# Relative importance of the predictors of momentary mood
+
+mydat <- params_happiness_clean_df 
+mydat$happiness <- ifelse(
+  mydat$happiness < -5 | mydat$happiness > 5, NA, mydat$happiness)
+
+
+foo <- mydat |> 
+  dplyr::select(c(w_outcome, w_stimulus, w_rpe, w_moodpre, w_control, w_trial))
+
+cor(foo)
+
+
+norev_df <- params_happiness_clean_df |> 
+  dplyr::filter(is_reversal == 0) |> 
+  group_by(user_id, trial) |> 
+  summarize(
+    happiness = mean(happiness), 
+    w_outcome = mean(w_outcome),
+    w_rpe = mean(w_rpe),
+    w_moodpre = mean(w_moodpre),
+    w_control = mean(w_control),
+    w_trial = mean(w_trial)
+  ) |> 
+  ungroup()
+
+for_plot_df <- norev_df |> 
+  group_by(trial) |> 
+  summarize(
+    h = mean(happiness),
+    w_trial = mean(w_trial)
+  )
+
+plot(for_plot_df$w_trial, for_plot_df$h, type = 'l')
+
+fit_norev <- brm(
+  h ~ trial + 
+    w_outcome + w_stimulus + w_rpe + w_moodpre + w_control +
+    (is_reversal * w_trial + w_outcome + w_stimulus + w_rpe + w_moodpre + 
+       w_control | user_id / ema_number),
+  data = mydat,
+  family = asym_laplace(),
+  prior = c(
+    set_prior("normal(0, 5)", class = "b"), # Weakly informative prior for fixed effects
+    set_prior("cauchy(0, 2)", class = "sd") # Weakly informative prior for random effects
+  ),
+  algorithm = "meanfield"
+)
+pp_check(fit2)
+
+
+
+
+
+fit2 <- brm(
+  happiness ~ is_reversal * w_trial + 
+    w_outcome + w_stimulus + w_rpe + w_moodpre + w_control +
+    (is_reversal * w_trial + w_outcome + w_stimulus + w_rpe + w_moodpre + 
+       w_control | user_id / ema_number),
+  data = mydat,
+  family = asym_laplace(),
+  prior = c(
+    set_prior("normal(0, 5)", class = "b"), # Weakly informative prior for fixed effects
+    set_prior("cauchy(0, 2)", class = "sd") # Weakly informative prior for random effects
+  ),
+  algorithm = "meanfield"
+)
+pp_check(fit2)
+
+summary(fit2)
+
+bayes_R2(fit2)
+#     Estimate   Est.Error      Q2.5     Q97.5
+# R2 0.4555724 0.009869782 0.4365242 0.4744727
+
+conditional_effects(fit2, "w_trial")
+loo_fit2 <- loo(fit2)
+
+
+fit3 <- brm(
+  happiness ~ is_reversal + 
+    w_outcome + w_stimulus + w_rpe + w_moodpre + w_control +
+    (is_reversal + w_outcome + w_stimulus + w_rpe + w_moodpre + 
+       w_control | user_id / ema_number),
+  data = mydat,
+  family = asym_laplace(),
+  prior = c(
+    set_prior("normal(0, 5)", class = "b"), # Weakly informative prior for fixed effects
+    set_prior("cauchy(0, 2)", class = "sd") # Weakly informative prior for random effects
+  ),
+  algorithm = "meanfield"
+)
+bayes_R2(fit3)
+
+loo_fit3 <- loo(fit3)
+
+loo_compare(loo_fit2, loo_fit3)
+
+
+# Using Stan
+
+library(cmdstanr)
+check_cmdstan_toolchain(fix = TRUE, quiet = TRUE)
+library(posterior)
+library(bayesplot)
+library(rstan)
+library(loo)
+color_scheme_set("brightblue")
+
+cmdstan_version()
+
+
+# Compile M8_picewise.stan
+sample_mod <- cmdstan_model(
+  "R/stan_code/M8_picewise.stan", 
+  stanc_options = list("O1"),
+  force_recompile = TRUE
+)
+
+# Create list for Stan data
+data_for_stan <- list(
+  N = nrow(params_happiness_clean_df),
+  happiness = params_happiness_clean_df$happiness,
+  X = as.matrix(params_happiness_clean_df[, c('w_outcome', 'w_stimulus', 'w_rpe', 'w_moodpre', 'w_control', 'w_trial')]),
+  J = length(unique(params_happiness_clean_df$user_id)),
+  subject = as.integer(factor(params_happiness_clean_df$user_id)),
+  is_reversal = as.integer(params_happiness_clean_df$is_reversal),
+  trial = params_happiness_clean_df$trial
+)
+
+str(stan_data)
+
+
+# Function to generate initial values
+init_function <- function() {
+  return(list(
+    alpha = runif(1, 0.1, 0.9),  # More constrained
+    beta = runif(6, 1.1, 1.9),  # More constrained and assuming beta is a vector of length 6
+    beta_reversal = runif(1, 0.1, 0.9),
+    beta_piecewise1 = runif(1, 0.1, 0.9),
+    beta_piecewise2 = runif(1, 0.1, 0.9),
+    sigma = runif(1, 0.1, 0.9),
+    sigma_subject = runif(1, 0.1, 0.9),
+    z_subject_raw = rnorm(215, 0, 1),  # Centered around 0 with std dev 1
+    kappa = runif(1, 0.1, 0.9)
+  ))
+}
+
+
+# Use Variational Inference
+sampled_vb <- sample_mod$variational(
+  data = data_for_stan,
+  # init = init_function,
+  seed = 123,
+  iter = 40000
+)
+
+draws_df <- as.data.frame(sampled_vb$draws())
+
+
+# Extract alpha and beta samples
+alpha_samples <- draws_df$alpha
+beta_samples <- draws_df[, grep("beta", names(draws_df))]
+
+# Convert beta_samples to a matrix
+beta_samples_matrix <- as.matrix(beta_samples)
+
+# Compute the posterior predictive mean for each observation
+posterior_predictive_means <- matrix(0, nrow = nrow(X_matrix), ncol = length(alpha_samples))
+
+for (s in 1:length(alpha_samples)) {
+  posterior_predictive_means[, s] <- alpha_samples[s] + X_matrix %*% beta_samples_matrix[s,]
+}
+
+# Compute the mean and 95% CI for the posterior predictive distribution
+post_pred_mean <- rowMeans(posterior_predictive_means)
+post_pred_lower <- apply(posterior_predictive_means, 1, function(x) quantile(x, 0.025))
+post_pred_upper <- apply(posterior_predictive_means, 1, function(x) quantile(x, 0.975))
+
+# Plot the observed data and the posterior predictive checks
+plot(data_for_stan$happiness, type = 'l', col = 'black', lty = 1, ylim = c(min(post_pred_lower), max(post_pred_upper)), xlab = "Index", ylab = "Happiness")
+lines(post_pred_mean, col = 'blue', lty = 2)
+lines(post_pred_lower, col = 'red', lty = 2)
+lines(post_pred_upper, col = 'red', lty = 2)
+legend("topright", legend = c("Observed", "Predicted", "95% CI"), col = c("black", "blue", "red"), lty = c(1, 2, 2))
+
+
+data_for_stan$predicted_happiness <- post_pred_mean
+
+
+# Aggregate observed data
+agg_data_observed <- params_happiness_clean_df %>%
+  group_by(is_reversal, trial) %>%
+  summarise(mean_happiness = mean(happiness)) |> 
+  ungroup()
+
+params_happiness_clean_df$predicted_happiness <- post_pred_mean
+
+agg_data_predicted <- params_happiness_clean_df %>% 
+  group_by(is_reversal, trial) %>%
+  summarise(mean_predicted_happiness = mean(predicted_happiness)) |> 
+  ungroup()
+
+ggplot() +
+  #geom_line(data = agg_data_observed, aes(x = trial, y = mean_happiness), color = "black", alpha = 0.5) +
+  geom_line(data = agg_data_predicted, aes(x = trial, y = mean_predicted_happiness), color = "red", alpha = 0.5) +
+  facet_wrap(~ is_reversal, ncol = 2) +
+  labs(title = "Model Fit by Session Type",
+       x = "Trial",
+       y = "Mean Happiness") +
+  scale_color_manual(values = c("Observed" = "black", "Predicted" = "red")) +
+  theme_minimal()
+
+#####
+
+# Step 1: Create a grid for 'trial'
+trial_grid = seq(min(params_happiness_clean_df$trial), max(params_happiness_clean_df$trial), length.out = 100)
+
+# Step 2 & 3: Compute Predicted Happiness and Average Them
+pdp_values = numeric(length(trial_grid))
+
+for (i in seq_along(trial_grid)) {
+  trial_value = trial_grid[i]
+  
+  # Create a modified data frame where all 'trial' values are set to the current grid value
+  modified_data = params_happiness_clean_df
+  modified_data$trial = trial_value
+  
+  # Extract the weights for this grid value (assuming weights are constant across trials)
+  params = c(
+    modified_data$w0[1], modified_data$w_outcome[1], modified_data$w_stimulus[1], 
+    modified_data$w_rpe[1], modified_data$w_moodpre[1], modified_data$w_control[1], 
+    modified_data$w_trial[1], modified_data$w_gamma[1]
+  )
+  
+  # Compute the predicted happiness using your original function
+  predicted_happiness = compute_predicted_happiness(params, modified_data)
+  
+  # Average these predictions to get the partial dependence for this 'trial' value
+  pdp_values[i] = mean(predicted_happiness)
+}
+
+# Step 4: Plot the Partial Dependence Plot
+plot(trial_grid, pdp_values, type = 'l', xlab = 'Trial', ylab = 'Average Predicted Happiness')
+
+####
+
+library(relaimpo)
+
+rw <- calc.relimp(
+  happiness ~ w_outcome + w_stimulus + w_rpe + w_moodpre + w_control + 
+    w_trial, 
+  data = params_happiness_clean_df, 
+  type = c("lmg"),
+  rela=TRUE
+  )
+print(rw)
+
+library(randomForest)
+
+# Selecting predictors and the dependent variable
+predictors <- params_happiness_clean_df[, c("w_outcome", "w_stimulus", "w_rpe", "w_moodpre", "w_control", "w_trial")]
+response <- params_happiness_clean_df$happiness
+
+# Train Random Forest model
+rf_model <- randomForest(x=predictors, y=response, ntree=500)
+
+# Show model summary
+print(rf_model)
+
+# Extract variable importance
+importance(rf_model)
+
+
+
+
+
+# eof ----
 
 
 

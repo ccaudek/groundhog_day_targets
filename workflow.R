@@ -1,3 +1,4 @@
+# This script is used to test the targets pipeline.
 
 # Libraries
 
@@ -120,3 +121,54 @@ mod_mood_2 <- brm(
   control = list(adapt_delta = 0.99, max_treedepth = 20),
   refresh = 0
 )
+
+
+tar_load(params_happiness_df)
+
+# Unnest the mle_params column
+expanded_df <- params_happiness_df %>%
+  unnest_wider(mle_params, names_sep = "_")
+
+expanded_df <- expanded_df %>% 
+  rename(
+    w0 = mle_params_1,
+    w_outcome = mle_params_2,
+    w_stimulus = mle_params_3,
+    w_rpe = mle_params_4,
+    w_moodpre = mle_params_5,
+    w_control = mle_params_6,
+    w_trial = mle_params_7,
+    w_gamma = mle_params_8
+  )
+
+glimpse(expanded_df)
+
+
+outlier_cols1 <- c(
+  "w0", "w_outcome", "w_stimulus", "w_rpe", "w_moodpre", "w_control", 
+  "w_trial", "w_gamma"
+  )
+
+params_happiness_df <- 
+  impute_outliers_params_happiness(expanded_df, outlier_cols1)
+
+# Step 2: Detect and impute outliers for mood and control variables
+outlier_cols2 <- c("mood_pre", "control", "mood_post")
+params_happiness_df <- 
+  impute_outliers_mood(params_happiness_df, outlier_cols2)
+
+# Step 3: Additional transformations
+params_happiness_df <- params_happiness_df %>%
+  group_by(user_id) %>%
+  mutate(
+    mood_dif = mood_post - mood_pre,
+    mood_pre_cw = mood_pre - mean(mood_pre, trim = 0.1),
+    environment = ifelse(is_reversal == 1, "Volatile", "Stable")
+  ) %>%
+  ungroup()
+
+
+
+
+
+
