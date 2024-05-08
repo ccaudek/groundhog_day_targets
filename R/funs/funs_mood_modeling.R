@@ -480,7 +480,8 @@ clean_params_happiness_model <- function(params_happiness_df) {
       mood_pre_cw = mood_pre - mean(mood_pre, trim = 0.1),
       environment = ifelse(is_reversal == 1, "Volatile", "Stable")
     ) %>%
-    ungroup()
+    ungroup() |> 
+    dplyr::rename(alpha = best_alpha)
   
   return(final_df)
 }

@@ -5,17 +5,19 @@
 # Then follow the manual to check and run the pipeline:
 #   <https://books.ropensci.org/targets/walkthrough.html#inspect-the-pipeline> # nolint
 
-# Load packages required to define the pipeline:
+# Loading package namespaces:
 suppressPackageStartupMessages({
   library("here")
   library("targets")
   library("tarchetypes")
   library("tidyverse")
   library("tidyr")
+  library("purrr")
   library("cmdstanr")
   library("brms")
   library("posterior")
   library("loo")
+  library("lme4")
   library("mice")
   library("parallel")
   library("emmeans")
@@ -29,16 +31,18 @@ suppressPackageStartupMessages({
 options(pillar.neg=FALSE)
 theme_set(bayesplot::theme_default(base_family = "sans"))
 
-SEED <- 48927 # set random seed for reproducibility
+# Set random seed for reproducibility:
+SEED <- 48927 
 
 # Set target options:
 tar_option_set(
   # packages that your targets need to run
   packages = c(
-    "here", "targets", "tarchetypes", "tidyverse", "tidyr", "cmdstanr", 
-    "brms", "posterior", "loo", "mice", "parallel", "emmeans", "quarto", 
-    "bayesplot", "gridExtra", "ggdist", "effectsize", "sjstats", "sjPlot", 
-    "sjmisc", "viridis"), 
+    "here", "targets", "tarchetypes", "tidyverse", "tidyr", "purrr",
+    "cmdstanr", "brms", "posterior", "loo", "mice", "parallel", "emmeans",
+    "quarto", "bayesplot", "gridExtra", "ggdist", "effectsize",
+    "sjstats", "sjPlot", "sjmisc", "viridis"
+  ),
   format = "rds", # default storage format
   seed = SEED
   # Set other options as needed.
@@ -50,10 +54,13 @@ options(clustermq.scheduler = "multicore")
 # tar_make_future() configuration (okay to leave alone):
 # Install packages {{future}}, {{future.callr}}, and {{future.batchtools}} to allow use_targets() to configure tar_make_future() options.
 
-# Run the R scripts in the R/ folder with your custom functions:
-tar_source(here::here("R", "funs", "funs_mood_modeling.R"))
-tar_source(here::here("R", "funs", "funs_brms.R"))
-tar_source(here::here("R", "funs", "funs_quest.R"))
+# Sourcing helper files:
+list.files(
+  here::here("R", "funs"),
+  pattern = "\\.R$", recursive = TRUE,
+  full.names = TRUE
+) %>%
+  walk(source)
 
 
 # Replace the target list below with your own:
@@ -82,10 +89,11 @@ list(
   )
 
   # brms model for alpha and volatility
+  # the distribution of alpha is bimodal. No congergence!
   # tar_target(
   #   brms_fitted_mod_alpha,
   #   brms_mod_alpha(params_happiness_clean_df)
-  # ),
+  # )
 
   # brms model for mood_dif
   # tar_target(

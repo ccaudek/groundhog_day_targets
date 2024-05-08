@@ -1,107 +1,210 @@
-# Script for the momentary mood analysis
-# Project: groundhog_day
+#' Script for the momentary mood analysis
+#' Project: groundhog day
+#' 
+#' To use this script, source _targets.R:
+source("_targets.R")
 
 
-tar_load(params_happiness_clean_df)
+# Momentary happiness ----------------------------------------------------------
 
-# Calculate mean and standard error of the mean (SEM)
-for_plot_df <- params_happiness_clean_df |> 
-  group_by(is_reversal, trial) |> 
+# Plot momentary happiness as a function of trial, for reversal and no-reversal
+# sessions. Adds the predictions of the momentary happiness model 
+
+# snippets/plot_happiness_model_predicitons.R
+
+
+# Piecewise Regression Analysis ------------------------------------------------
+
+# snippets/piecewise_regression_analysis.R
+
+
+
+
+stancode(fit3_rev)
+
+#### Questo è per controllare che i valori predetti dal modello 2 siano 
+#### coerenti con le medie riportate nella figura che motiva l'analisi statistica.
+
+# Calculate the mean fitted value for each observation
+average_fitted_values <- apply(foo, 2, mean)  # Apply the mean function across rows (MCMC samples)
+
+# Add the average fitted values to the original data frame
+bysubj_rev_df$average_fitted_happiness <- average_fitted_values
+
+# Now, if you want to get the average predicted happiness for each level of 't', you can group by 't' and summarize.
+average_fitted_per_t <- bysubj_rev_df %>%
+  group_by(trial) %>%
+  summarize(average_happiness = mean(average_fitted_happiness, na.rm = TRUE))
+
+average_fitted_per_t |> 
+  ggplot(aes(x = trial, y = average_happiness)) +
+  geom_line() +
+  ggtitle("Average Predicted Happiness as a Function of t")
+
+# ------------------------------------------------------------------------------
+
+# The difference mood_post - mood_pre is accounted for by the regression 
+# toward the mean.
+
+temp <- params_happiness_clean_df
+temp$mdif <- temp$mood_post - temp$mood_pre
+
+bysubj_mood_df <- temp |> 
+  group_by(user_id) |> 
   summarize(
-    h = mean(happiness, trim = 0.1, na.rm = TRUE),
-    h_hat = mean(predicted_happiness, trim = 0.1, na.rm = TRUE),
-    h_sem = sd(happiness, na.rm = TRUE) / sqrt(n()),
-    h_hat_sem = sd(predicted_happiness, na.rm = TRUE) / sqrt(n())
+    mood_dif = mean(mdif),
+    m_pre = mean(mood_pre)
   ) |> 
   ungroup()
-for_plot_df$is_reversal <- as.factor(for_plot_df$is_reversal)
 
-# Create the plot
-for_plot_df |> 
-  ggplot(aes(x=trial)) +
-  geom_line(aes(y=h), color = viridis(3)[1], linewidth = 2) +  # Line for h
-  geom_ribbon(aes(ymin = h - h_sem, ymax = h + h_sem), alpha = 0.2) +  # Ribbon for h
-  geom_line(aes(y=h_hat), color = viridis(3)[2], linewidth = 1.0) +  # Line for h_hat
-  #geom_ribbon(aes(ymin = h_hat - h_hat_sem, ymax = h_hat + h_hat_sem), alpha = 0.2, fill = "red") +  # Ribbon for h_hat
-  facet_wrap(~ is_reversal) +
-  theme_default()  # Apply the bayesplot theme
+bysubj_mood_df$md <- as.vector(scale(bysubj_mood_df$mood_dif))
+bysubj_mood_df$mp <- as.vector(scale(bysubj_mood_df$m_pre))
 
+  
+fm <- lm(
+  md ~ mp,
+  data = bysubj_mood_df
+)
+summary(fm)
 
-
-
-
-# Increase of happiness within a session
-
-tar_load(params_happiness_clean_df)
-
-norev_df <- params_happiness_clean_df |> 
-  dplyr::filter(is_reversal == 0) 
-
-rev_df <- params_happiness_clean_df |> 
-  dplyr::filter(is_reversal == 1) 
-
-for_plot_df <- rev_df |> 
-  group_by(trial) |> 
-  summarize(
-    h = mean(happiness, trim = 0.1)
-  )
-
-plot(for_plot_df$trial, for_plot_df$h, type = 'l')
-
-rev_df$epoch <- ifelse(
-  rev_df$trial < 16, 0, 1
+mod1 <- brm(
+  md ~ se * mp + (se * mp | user_id),
+  data = bysubj_sess_mood_df,
+  backend = "cmdstanr",
+  cores = 8, 
+  chains = 4,
+  iter = 5000,
+  prior = c(
+    set_prior("normal(0, 1)", class = "b"), # Weakly informative prior for fixed effects
+    set_prior("cauchy(0, 1)", class = "sd"), # Weakly informative prior for random effects sd
+    set_prior("lkj(2)", class = "cor") # Weakly informative prior for random effects correlations
+  ),
+  threads = threading(2),
 )
 
-rev_df$t <- rev_df$trial - 16
+summary(mod1)
 
-bysubj_rev_df <- rev_df |> 
-  group_by(user_id, epoch, t) |> 
-  summarize(
-    happiness = mean(happiness, trim = 0.1),
-  ) |> 
-  ungroup()
+conditional_effects(mod1, "mp:se")
+performance::r2_bayes(mod1)
 
-# Convert factor 'epoch' to numeric if it's not already
-bysubj_rev_df$epoch <- as.numeric(as.character(bysubj_rev_df$epoch))
 
-# Assuming 't' is centered around 0, we create the new variables 
-# for the slopes
-bysubj_rev_df$trial_pre = ifelse(bysubj_rev_df$t < 0, bysubj_rev_df$t, 0)
-bysubj_rev_df$trial_post = ifelse(bysubj_rev_df$t >= 0, bysubj_rev_df$t, 0)
+# ------------------------------------------------------------------------------
 
-# Now, we fit the model with brms using these new variables
+# This works, but requires more iterations.
 fit_rev <- brm(
-  bf(happiness ~ 1 + epoch * trial_pre + epoch * trial_post + 
-       (1 + epoch * trial_pre + epoch * trial_post | user_id)),
-  data = bysubj_rev_df,
-  family = gaussian(),
+  happiness ~ epoch + t + (epoch + t | user_id / ema_number),
+  data = rev_df,
+  family = asym_laplace(),
   backend = "cmdstanr",
-  chains = 2,
-  iter = 1000,
-  # prior = c(
-  #   set_prior("normal(0, 5)", class = "b"), # Weakly informative prior for fixed effects
-  #   set_prior("cauchy(0, 2.5)", class = "sd", group = "user_id"), # Weakly informative prior for random effects sd
-  #   set_prior("lkj(2)", class = "cor", group = "user_id") # Weakly informative prior for random effects correlations
-  # ),
+  prior = c(
+    set_prior("normal(0, 0.5)", class = "b"), # Weakly informative prior for fixed effects
+    set_prior("cauchy(0, 1)", class = "sd", group = "user_id"), # Weakly informative prior for random effects sd
+    set_prior("lkj(2)", class = "cor", group = "user_id") # Weakly informative prior for random effects correlations
+  ),
+  cores = 4,
+  chains = 4,
   threads = threading(4)
 )
-
-pp_check(fit_rev) + xlim(-3, 3)
+pp_check(fit_rev)
 
 summary(fit_rev)
-marginal_effects(fit_rev, "trial_pre")
-marginal_effects(fit_rev, "epoch")
-marginal_effects(fit_rev, "trial:epoch")
+conditional_effects(fit_rev, "t")
+bayes_R2(fit_rev)
 
+performance::r2_bayes(fit_rev)
 
-r2_bayes(fit_rev)
-
-
-
+loo_fit_rev <- loo(fit_rev)
 
 
 
 
+
+
+
+
+mod <- cmdstan_model("R/stan_code/M11.stan", compile = FALSE)
+mod$format(canonicalize = TRUE)
+
+# Assuming each subject has a unique user_id and each session is uniquely identified by a combination of user_id and ema_number
+# Create a new column to uniquely identify sessions
+rev_df <- rev_df %>%
+  mutate(session_id = interaction(user_id, ema_number, drop = TRUE))
+
+# Create a vector to indicate which subject each observation belongs to
+subject <- as.integer(factor(rev_df$user_id))
+
+# Create a vector to indicate which session each observation belongs to
+session <- as.integer(factor(rev_df$ema_number))
+
+# Get the total number of observations, subjects, and trials per session
+N <- nrow(rev_df)
+S <- length(unique(rev_df$user_id))
+T <- 30  # since you mentioned each session has 30 trials
+
+# Get the number of sessions per subject
+n_sessions <- table(rev_df$user_id)
+
+# Prepare the data list for Stan
+stan_data <- list(
+  N = N,
+  S = S,
+  T = T,
+  n_sessions = n_sessions,
+  x = rev_df$trial,
+  y = rev_df$happiness,  # replace with the name of your response variable
+  subject = subject,
+  session = session
+)
+
+# Now you can use stan_data as the data input for your Stan model
+
+
+# Compile M9_piecewise.stan
+sample_mod <- cmdstan_model(
+  "R/stan_code/M11.stan", 
+  stanc_options = list("O1"),
+  force_recompile = TRUE
+)
+
+# Use Variational Inference
+sampled_vb <- sample_mod$variational(
+  data = stan_data,
+  seed = 123,
+  iter = 40000
+)
+sampled_vb$summary()
+
+# Sample with MCMC
+sampled <- sample_mod$sample(
+  data = stan_data,
+  chains = 2,
+  parallel_chains = 2,
+  iter_sampling = 700,
+  iter_warmup = 200,
+  refresh = 20
+)
+sampled$summary()
+
+beta1 <- sampled$summary("beta1")
+beta2 <- sampled$summary("beta2")
+mu_beta1 <- sampled$summary("mu_beta1")
+mu_beta2 <- sampled$summary("mu_beta2")
+
+draws <- sampled$draws(format = "df")
+
+df <- data.frame(
+  beta = c(draws$mu_beta1, draws$mu_beta2),
+  segment = factor(rep(c("Segment 1", "Segment 2"), each = length(draws$mu_beta1)))
+)
+
+ggplot(df, aes(x = segment, y = beta, fill = segment)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) +
+  labs(
+    title = "Group Effects for mu_beta1 and mu_beta2",
+    y = "Parameter Estimate",
+    x = "Segment"
+  )
 
 
 
@@ -141,7 +244,7 @@ pp_check(fit_norev) #+ xlim(-3, 3)
 summary(fit_norev)
 marginal_effects(fit_norev, "trial")
 
-r2_bayes(fit_norev)
+performance::r2_bayes(fit_norev)
 
 
 

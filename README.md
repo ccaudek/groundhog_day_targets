@@ -1,6 +1,8 @@
 # Groundhog Day project
 
-**Repository:** `groundhog_day_targets``
+Project Universally Unique Identifier: 9811beb3-2dc5-481f-8b0f-2e8c12936507
+
+**Repository:** `groundhog_day_targets`
 
 In this project, the R scripts are used within the `targets` workflow.
 

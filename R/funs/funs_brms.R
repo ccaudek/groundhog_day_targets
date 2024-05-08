@@ -3,13 +3,37 @@
 
 brms_mod_alpha <- function(params_happiness_clean_df) {
   
+  df <- params_happiness_clean_df |> 
+    group_by(user_id, environment, ema_number) |> 
+    summarize(
+      alpha = mean(alpha)
+    ) |> 
+    ungroup()
+  df$environment <- factor(df$environment)
+  hist(df$alpha)
+  
   mod_alpha <- brm(
     alpha ~ environment +
-      (environment | user_id / ema_number),
-    family = asym_laplace(),
-    algorithm = "meanfield",
-    data = params_happiness_clean_df,
-    refresh = 0
+      (environment | user_id) + (1 | ema_number),
+    family = gaussian(),
+    backend = "cmdstanr",
+    data = df,
+    chains = 2,
+    cores = 2,
+    threads = threading(2)
+     #refresh = 0
+  )
+  
+  mix <- mixture(gaussian, gaussian)
+  mod_alpha <- brm(
+    alpha ~ environment +
+      (environment | user_id),
+    family = mix,
+    backend = "cmdstanr",
+    data = df,
+    chains = 2,
+    cores = 2,
+    threads = threading(2)
   )
 }
 
@@ -25,9 +49,11 @@ brms_mod_mood_1 <- function(params_happiness_clean_df) {
     backend = "cmdstanr",
     iter = 5000,
     warmup = 1000,
-    cores = 8,
     data = params_happiness_clean_df,
     control = list(adapt_delta = 0.99, max_treedepth = 20),
+    chains = 2,
+    cores = 4,
+    threads = threading(2),
     refresh = 0
   )
 }

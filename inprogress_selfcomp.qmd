@@ -1,0 +1,779 @@
+---
+title-block-banner: true
+title: "Self-Compassion and Mood Dynamics"
+author: "Corrado Caudek (corrado.caudek@unifi.it)"
+description: "Groundhog Day Project"
+format: 
+  html:
+    code-line-numbers: true
+    anchor-sections: true
+    smooth-scroll: true
+    grid:
+      margin-width: 600px
+editor: source
+toc: True
+toc-location: left
+date: last-modified
+date-format: iso
+
+---
+
+# Packages & functions
+
+```{r}
+library(lme4)
+# Loading package namespaces and sourcing helper files:
+source("_targets.R")
+```
+
+# Import data
+
+```{r}
+tar_load(params_happiness_clean_df)
+```
+
+
+```{r, echo=FALSE}
+#| column: margin
+# Calculate mean and standard error of the mean (SEM)
+for_plot_df <- params_happiness_clean_df |> 
+  group_by(is_reversal, trial) |> 
+  summarize(
+    h = mean(happiness, trim = 0.1, na.rm = TRUE),
+    h_hat = mean(predicted_happiness, trim = 0.1, na.rm = TRUE),
+    h_sem = sd(happiness, na.rm = TRUE) / sqrt(n()),
+    h_hat_sem = sd(predicted_happiness, na.rm = TRUE) / sqrt(n())
+  ) |> 
+  ungroup()
+for_plot_df$is_reversal <- as.factor(for_plot_df$is_reversal)
+
+# Create the plot
+for_plot_df |> 
+  ggplot(aes(x=trial)) +
+  geom_line(aes(y=h), color = viridis(3)[1], linewidth = 2) +  # Line for h
+  geom_ribbon(aes(ymin = h - h_sem, ymax = h + h_sem), alpha = 0.2) +  # Ribbon for h
+  geom_line(aes(y=h_hat), color = viridis(3)[2], linewidth = 1.0) +  # Line for h_hat
+  #geom_ribbon(aes(ymin = h_hat - h_hat_sem, ymax = h_hat + h_hat_sem), alpha = 0.2, fill = "red") +  # Ribbon for h_hat
+  facet_wrap(~ is_reversal) +
+  theme_default()  # Apply the bayesplot theme
+```
+
+
+
+
+```{r}
+scs_scores <- rio::import(
+  here::here(
+    "data", "prep", "quest_scales", "scs_scores.csv"
+  )
+)
+scs_scores$user_id <- as.numeric(scs_scores$user_id)
+
+mydat <- left_join(params_happiness_clean_df, scs_scores, by = "user_id")
+
+mydat <- mydat[!is.na(mydat$scs_total_score), ]
+length(unique(mydat$user_id))
+
+mydat$scs <- as.vector(scale(mydat$scs_total_score))
+mydat$mpre <- as.vector(scale(mydat$mood_pre))
+mydat$mpost <- as.vector(scale(mydat$mood_post))
+mydat$zcontr <- as.vector(scale(mydat$control))
+```
+
+```{r}
+for_plot_df <- mydat |> 
+	group_by(user_id) |> 
+	summarise(scs = mean(scs, na.rm = TRUE)) 
+
+plot(density(for_plot_df$scs))
+```
+
+Group by user_id and session
+
+```{r}
+by_sess_subj_df <- mydat |> 
+	group_by(user_id, environment, ema_number) |> 
+	summarize(
+		scs = mean(scs),
+		mood_pre_cw = mean(mood_pre_cw),
+		mpre = mean(mpre),
+		zcontr = mean(zcontr),
+		zcontr = mean(zcontr),
+		alpha = mean(alpha),
+		outcome = mean(outcome),
+		rpe = mean(RPE),
+		w0 = mean(w0),
+		w_outcome = mean(w_outcome),
+		w_stimulus = mean(w_stimulus),
+		w_rpe = mean(w_rpe),
+		w_moodpre = mean(w_moodpre),
+		w_control = mean(w_control),
+		w_trial = mean(w_trial),
+		w_gamma = mean(w_gamma)
+	) |> 
+	ungroup()
+```
+
+
+
+```{r}
+fm <- lmer(
+	outcome ~ scs + ema_number + environment +
+		(ema_number + environment | user_id),
+	data = by_sess_subj_df
+)
+summary(fm)
+```
+
+```{r}
+mod1 <- brm(
+	outcome ~ scs + ema_number + environment +
+		(ema_number + environment | user_id),
+	family = asym_laplace(),
+	data = by_sess_subj_df,
+	backend = "cmdstanr"
+)
+```
+
+```{r}
+pp_check(mod1)
+```
+
+```{r}
+summary(mod1)
+```
+```{r}
+conditional_effects(mod1, "ema_number")
+```
+
+```{r}
+conditional_effects(mod1, "environment")
+```
+
+
+```{r}
+conditional_effects(mod1, "scs")
+```
+
+Performance (in terms of total positive feedbacks) is not associated with the SCS total score.
+
+```{r}
+bysubj_df <- by_sess_subj_df |> 
+	group_by(user_id) |> 
+	summarize(
+		alpha = mean(alpha),
+		scs = mean(scs),
+		mpre = mean(mpre),
+		zcontr = mean(zcontr)
+	)
+```
+
+```{r}
+hist(by_sess_subj_df$w_outcome)
+```
+
+```{r}
+by_sess_subj_df$session <- as.vector(scale(by_sess_subj_df$ema_number))
+```
+
+
+```{r}
+fm <- lmer(
+  happiness ~ trial + w_outcome + w_stimulus + w_rpe + w_moodpre + 
+                               w_control + w_trial + w_gamma + 
+		(1 | user_id / ema_number),
+	data = mydat
+)
+```
+
+```{r}
+summary(fm)
+```
+
+
+
+```{r}
+mod2 <- brm(
+	w_outcome ~ scs * environment * session + 
+		(environment * session | user_id),
+	family = asym_laplace(),
+	data = by_sess_subj_df,
+	backend = "cmdstanr",
+	# algorithm = "meanfield"
+	chains = 2, 
+	cores = 4,
+	threads = threading(4)
+)
+```
+
+```{r}
+pp_check(mod2) # + xlim(-1, 1)
+```
+
+```{r}
+summary(mod2)
+```
+
+```{r}
+bayes_R2(mod2)
+```
+
+```{r}
+conditions <- make_conditions(mod2, "environment")
+conditional_effects(mod2, "session")
+```
+
+```{r}
+mod3 <- brm(
+	w_stimulus ~ scs * environment * session + 
+		(environment * session | user_id),
+	family = student(),
+	data = by_sess_subj_df,
+	backend = "cmdstanr",
+	# algorithm = "meanfield"
+	chains = 2, 
+	cores = 4,
+	threads = threading(4)
+)
+```
+
+```{r}
+pp_check(mod3) + xlim(-1, 1)
+```
+
+```{r}
+summary(mod3)
+```
+
+```{r}
+conditional_effects(mod3, "scs:environment")
+```
+
+```{r}
+mod4 <- brm(
+	w_rpe ~ scs * environment + 
+		(environment | user_id / session),
+	family = student(),
+	data = by_sess_subj_df,
+	backend = "cmdstanr",
+	# algorithm = "meanfield"
+	chains = 2, 
+	cores = 4,
+	threads = threading(4)
+)
+```
+
+```{r}
+bayes_R2(mod4)
+```
+
+```{r}
+summary(mod4)
+```
+
+
+```{r}
+mod5 <- brm(
+	w_moodpre ~ scs * environment + 
+		(environment | user_id / session),
+	family = student(),
+	data = by_sess_subj_df,
+	backend = "cmdstanr",
+	chains = 2, 
+	cores = 4,
+	threads = threading(4)
+)
+```
+
+```{r}
+bayes_R2(mod5)
+```
+
+
+#### Log-odds parameterization
+
+Alternatively, we can express a model where the core parameter of interest is the log-odds of success:
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/bernoulli/non_hierarchical_bernoulli_logit'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+#### Log-odds parameterization with regression
+
+The log-odds parameterization is popular as its unconstrained scale enables straightforward use of conventional regression math. For, if each observation were associated with a time-of-day and we were interested in both the overall log-odds of success as well as any effect of time-of-day on the log-odds of success, we could express a model as:
+
+```{r, echo=FALSE, class.output='stan', comment=""}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/bernoulli/non_hierarchical_bernoulli_logit_regression'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+cat_file(stan_file)
+```
+
+
+
+#### Log-odds parameterization with multiple regression
+
+
+```{r, echo=FALSE, class.output='stan', comment=""}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/bernoulli/non_hierarchical_bernoulli_logit_multiregression'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+cat_file(stan_file)
+```
+
+
+#### Performance boost through sufficient statistics
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/bernoulli/non_hierarchical_bernoulli_logit_sufficient'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+#### Sufficient stats amidst regression
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/bernoulli/non_hierarchical_bernoulli_logit_regression_sufficient'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+#### Sufficient stats amidst multiple regression
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/bernoulli/non_hierarchical_bernoulli_logit_multiregression_sufficient'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+## Gaussian outcomes
+
+```{r, echo=FALSE, class.output='stan', comment=""}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/gaussian/non_hierarchical_gaussian'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+cat_file(stan_file)
+```
+
+#### Location regression
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/gaussian/non_hierarchical_gaussian_regression'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+#### Location-scale regression
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/gaussian/non_hierarchical_gaussian_regression_2'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+#### Location-scale multiple-regression
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/gaussian/non_hierarchical_gaussian_multiregression'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+
+#### Performance boost through sufficient statistics
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/gaussian/non_hierarchical_gaussian_sufficient'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+#### Sufficient stats amidst regression
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/gaussian/non_hierarchical_gaussian_regression_sufficient'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+
+#### Sufficient stats amidst multiple-regression
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/non_hierarchical/gaussian/non_hierarchical_gaussian_multiregression_sufficient'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+
+# Introducing hierarchy
+
+A fully-pooled model:
+
+```{r, echo=FALSE, class.output='stan', comment=""}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_fully_pooled'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+cat_file(stan_file)
+```
+
+A vectorized version (non_hierarchical_gaussian_sufficientnote the data variable `obs`, previously a 2D array, is now a 1D array):
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_fully_pooled_vectorized'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+An unpooled model:
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_unpooled'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+A vectorized version:
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_unpooled_vectorized'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+From here on, only vectorized.
+
+A partially-pooled model, using monolithically centered-and-scaled parameterization:
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_partially_pooled_monolithically_centered_and_scaled'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+A partially-pooled model, using monolithically uncentered-and-unscaled parameterization:
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_partially_pooled_monolithically_uncentered_and_unscaled'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+A partially-pooled model, using monolithically uncentered-and-unscaled parameterization via offset/multiplier:
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_partially_pooled_monolithically_uncentered_and_unscaled_offset_multiplier'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+A partially-pooled model, with monolithic centering_and_scaling behaviour set by a data toggle:
+
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_partially_pooled_monolithic_offset_multiplier_toggle'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+A non-monolithically centered-and-scaled parameterization: 
+
+
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_partially_pooled_nonmono_centered_and_scaled'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+Hierarchical Location-scale:
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_location_scale/'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+
+Slightly more compact expression:
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_location_scale_compact'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+
+Correlated-Location-Scale:
+```{r,echo=FALSE}
+#| column: margin
+stan_mod_dir = 'stan/hierarchical/gaussian/hierarchical_gaussian_location_scale_cor'
+stan_file = stan_mod_dir %>% fs::path(.,fs::path_file(.),ext='stan')
+stan_dep_graph(stan_file,legend='right',label_split = '_')
+```
+::: {.panel-tabset}
+## Changes
+```{r, echo=FALSE, class.output='stan', comment=""}
+stan_file_dots = (stan_file %>% fs::path_ext_remove() %>% paste0('_dots') %>% fs::path_ext_set('stan'))
+cat_file(stan_file_dots)
+```
+## Full code
+```{r, echo=FALSE, class.output='stan', comment=""}
+cat_file(stan_file)
+```
+:::
+

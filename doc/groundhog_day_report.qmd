@@ -1,12 +1,21 @@
 ---
+title-block-banner: true
 title: "Momentary Subjective Happiness"
-subtitle: "Autobiographical Probabilistic Reversal Learning Project"
-author: "Corrado Caudek"
-date: "10/21/2023"
+description: "Autobiographical Probabilistic Reversal Learning Project"
+author: "Corrado Caudek (corrado.caudek@unifi.it)"
 bibliography: bibliography.bib
 csl: apa.csl
-format: html
-editor: visual
+format: 
+  html:
+    code-line-numbers: true
+    anchor-sections: true
+    smooth-scroll: true
+    grid:
+      margin-width: 600px
+editor: source
+toc: True
+date: last-modified
+date-format: iso
 ---
 
 # Introduction
